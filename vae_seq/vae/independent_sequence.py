@@ -80,7 +80,7 @@ class _GenRNN(snt.AbstractModule):
 
     def _build(self, z, context, observed, feedback=False):
         hparams = self._hparams
-        core = feedback_rnn_core.FeedbackRNNCore(
+        core = feedback_rnn_core.FeedbackCore(
             util.make_rnn(hparams, name='gen_core'),
             _GenRNNFeedbackEncoder(hparams, self._obs_encoder),
             _GenRNNFeedbackDecoder(hparams, self._obs_decoder, feedback=feedback))

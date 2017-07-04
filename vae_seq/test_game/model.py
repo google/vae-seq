@@ -1,10 +1,10 @@
 import threading
 import numpy as np
 import tensorflow as tf
+
 from . import game as game_mod
 from .. import obs_layers
 from .. import model
-
 
 class Model(model.Model):
     def __init__(self, hparams):

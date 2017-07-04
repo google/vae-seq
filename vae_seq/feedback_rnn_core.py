@@ -1,6 +1,6 @@
 import sonnet as snt
 
-class FeedbackRNNCore(snt.RNNCore):
+class FeedbackCore(snt.RNNCore):
     """Wraps an RNN Core to make the input depend on the previous output."""
 
     def __init__(self, core, encode, decode, name=None):
@@ -10,7 +10,7 @@ class FeedbackRNNCore(snt.RNNCore):
           encode: inputs, feedback_state -> inner_input, decode_state
           decode: inner_output, decode_state -> output, feedback_state
         """
-        super(FeedbackRNNCore, self).__init__(name or self.__class__.__name__)
+        super(FeedbackCore, self).__init__(name or self.__class__.__name__)
         self._core = core
         self._encode = encode
         self._decode = decode

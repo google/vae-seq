@@ -52,7 +52,7 @@ class SRNN(snt.AbstractModule):
         latent_q = latent.LatentDecoder(hparams, name='latent_q')
 
         # Generative model.
-        gen_core = feedback_rnn_core.FeedbackRNNCore(
+        gen_core = feedback_rnn_core.FeedbackCore(
             d_core,
             _GenRNNFeedbackEncoder(hparams, self._obs_encoder),
             _GenRNNFeedbackDecoder(hparams, self._obs_decoder, latent_p))
