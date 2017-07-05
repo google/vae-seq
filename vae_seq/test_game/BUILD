@@ -16,6 +16,15 @@ py_library(
     ],
 )
 
+py_test(
+    name = "model_test",
+    srcs = ["model_test.py"],
+    deps = [
+        ":model",
+        "//vae_seq:hparams",
+    ],
+)
+
 py_binary(
     name = "test_game",
     srcs = ["test_game.py"],
