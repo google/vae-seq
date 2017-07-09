@@ -1,3 +1,5 @@
+import tensorflow as tf
+
 def _defaults():
     # Shape of observed events, set in game-specific code.
     obs_shape = None
@@ -40,13 +42,7 @@ def _defaults():
     return locals()
 
 
-class HParams(object):
-    def __init__(self, **kwargs):
-        self.__dict__.update(_defaults())
-        self.__dict__.update(kwargs)
-
-    def __repr__(self):
-        return ('HParams(\n' +
-                ',\n'.join(['    ' + k + '=' + repr(v)
-                           for k, v in sorted(self.__dict__.items())]) +
-                ')')
+def HParams(**kwargs):
+    init = _defaults()
+    init.update(kwargs)
+    return tf.contrib.training.HParams(**init)

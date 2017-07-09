@@ -1,8 +1,9 @@
 from . import vae as vae_mod
 
+import abc
 import re
+import six
 import tensorflow as tf
-
 
 def in_model_graph(fn):
     """Decorates a method to execute in the context of the model's graph."""
@@ -37,6 +38,7 @@ class create_or_use(object):
             self._sess.__exit__(*args, **kwargs)
 
 
+@six.add_metaclass(abc.ABCMeta)
 class Model(object):
     def __init__(self, hparams, context, observed):
         vae = vae_mod.VAE_TYPES[hparams.vae_type](
@@ -44,8 +46,6 @@ class Model(object):
             self.make_obs_encoder(hparams),
             self.make_obs_decoder(hparams))
         vae_tensors = vae(context, observed)
-        gen_prob = tf.reduce_mean(tf.exp(vae_tensors.gen_log_prob), axis=0)
-        tf.summary.scalar('gen_prob', gen_prob)
         divergence = tf.reduce_mean(vae_tensors.inf_kl, axis=0)
         tf.summary.scalar('divergence', divergence)
         inf_log_prob = tf.reduce_mean(vae_tensors.inf_log_prob, axis=0)
@@ -82,8 +82,7 @@ class Model(object):
             dict(step=tf.train.get_or_create_global_step(),
                  divergence=self.divergence,
                  inf_log_prob=self.inf_log_prob,
-                 elbo=self.elbo,
-                 gen_prob=self.gen_prob,),
+                 elbo=self.elbo,),
             every_n_secs=60. * 5)
         return tf.train.MonitoredTrainingSession(
             checkpoint_dir=hparams.logdir,
@@ -133,11 +132,14 @@ class Model(object):
         for i in range(min(5, hparams.batch_size)):
             self.display_sequence(vals['context'][i], vals['gen_sample'][i])
 
+    @abc.abstractmethod
     def display_sequence(self, context, sample):
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def make_obs_encoder(self, hparams):
         raise NotImplementedError()
 
+    @abc.abstractmethod
     def make_obs_decoder(self, hparams):
         raise NotImplementedError()

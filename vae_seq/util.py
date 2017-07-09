@@ -15,16 +15,10 @@ VAETensors = collections.namedtuple('VAETensors', [
 ])
 
 
-def dummy_observed(hparams):
-    return tf.zeros(
-        [hparams.batch_size, hparams.sequence_size] + hparams.obs_shape,
-        name='dummy_observed')
-
-
 def calc_kl(hparams, q_sample, dist_q, dist_p):
     if hparams.use_monte_carlo_kl:
         return dist_q.log_prob(q_sample) - dist_p.log_prob(q_sample)
-    return distributions.kl(dist_q, dist_p)
+    return distributions.kl_divergence(dist_q, dist_p)
 
 
 def reverse_dynamic_rnn(cell, inputs, time_major=False, **kwargs):

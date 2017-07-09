@@ -1,6 +1,12 @@
 package(default_visibility = ["//visibility:public"])
 
 py_library(
+    name = "base",
+    srcs = ["base.py"],
+    deps = [],
+)
+
+py_library(
     name = "latent",
     srcs = ["latent.py"],
     deps = [
@@ -12,39 +18,26 @@ py_library(
     name = "independent_sequence",
     srcs = ["independent_sequence.py"],
     deps = [
+        ":base",
         ":latent",
-        "//vae_seq:feedback_rnn_core",
+        ":independent_sequence_distribution",
         "//vae_seq:util",
     ],
 )
 
-py_test(
-    name = "independent_sequence_test",
-    srcs = ["independent_sequence_test.py"],
-    deps = [
-        ":independent_sequence",
-        "//vae_seq:hparams",
-        "//vae_seq:obs_layers",
-    ],
+py_library(
+    name = "independent_sequence_distribution",
+    srcs = ["independent_sequence_distribution.py"],
+    deps = [],
 )
 
 py_library(
     name = "srnn",
     srcs = ["srnn.py"],
     deps = [
+        ":base",
         ":latent",
-        "//vae_seq:feedback_rnn_core",
         "//vae_seq:util",
-    ],
-)
-
-py_test(
-    name = "srnn_test",
-    srcs = ["srnn_test.py"],
-    deps = [
-        ":srnn",
-        "//vae_seq:hparams",
-        "//vae_seq:obs_layers",
     ],
 )
 
@@ -54,5 +47,16 @@ py_library(
     deps = [
         ":independent_sequence",
         ":srnn",
+    ],
+)
+
+py_test(
+    name = "vae_test",
+    srcs = ["vae_test.py"],
+    deps = [
+        ":vae",
+        "//vae_seq:hparams",
+        "//vae_seq:obs_layers",
+        "//vae_seq:util",
     ],
 )

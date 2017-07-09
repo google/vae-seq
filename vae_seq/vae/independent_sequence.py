@@ -2,11 +2,12 @@ import sonnet as snt
 import tensorflow as tf
 from tensorflow.contrib import distributions
 
+from . import base
 from . import latent
-from .. import feedback_rnn_core
+from . import independent_sequence_distribution as iseq_dist
 from .. import util
 
-class IndependentSequenceVAE(snt.AbstractModule):
+class IndependentSequenceVAE(base.VAEBase):
     """Simple extension of VAE to a sequential setting.
 
     Notation:
@@ -29,116 +30,20 @@ class IndependentSequenceVAE(snt.AbstractModule):
                                          [c_1, x_1] [c_t, x_t]
     """
 
-    def __init__(self, hparams, obs_encoder, obs_decoder, name=None):
-        super(IndependentSequenceVAE, self).__init__(
-            name or self.__class__.__name__)
-        self._hparams = hparams
-        self._obs_encoder = obs_encoder
-        self._obs_decoder = obs_decoder
-
-    def _build(self, context, observed=None):
+    def _prior_latent(self):
+        """Prior distribution over the latent variables."""
         hparams = self._hparams
-        if observed is None:
-            observed = util.dummy_observed(hparams)
+        dims = [hparams.batch_size, hparams.sequence_size, hparams.state_size]
+        return iseq_dist.IndependentSequence(
+            distributions.MultivariateNormalDiag(
+                loc=tf.zeros(dims),
+                scale_diag=tf.ones(dims),
+                name='p_z_dist'))
 
-        gen_rnn = _GenRNN(hparams, self._obs_encoder, self._obs_decoder)
-        inf_rnn = _InfRNN(hparams, self._obs_encoder)
-
-        # Generative model.
-        p_z = _PriorState(hparams)
-        gen_z = p_z.sample()
-        gen_x, gen_log_prob = gen_rnn(gen_z, context, observed, feedback=True)
-
-        # Inference model.
-        q_z = inf_rnn(context, observed)
-        inf_z = q_z.sample()
-        inf_x, inf_log_prob = gen_rnn(inf_z, context, observed, feedback=False)
-        inf_kl = util.calc_kl(hparams, inf_z, q_z, p_z)
-
-        return util.VAETensors(
-            gen_z, gen_x, gen_log_prob,
-            inf_z, inf_x, inf_log_prob, inf_kl)
-
-
-def _PriorState(hparams):
-    """Prior distribution over the State."""
-    dims = [hparams.batch_size, hparams.sequence_size, hparams.state_size]
-    return IndependentSequence(
-        distributions.MultivariateNormalDiag(
-            loc=tf.zeros(dims),
-            scale_diag=tf.ones(dims)))
-
-
-class _GenRNN(snt.AbstractModule):
-    """State -> samples, log_prob(observed)."""
-    def __init__(self, hparams, obs_encoder, obs_decoder, name=None):
-        super(_GenRNN, self).__init__(
-            name or self.__class__.__name__)
-        self._hparams = hparams
-        self._obs_encoder = obs_encoder
-        self._obs_decoder = obs_decoder
-
-    def _build(self, z, context, observed, feedback=False):
+    def _inferred_latent(self, context, enc_observed):
+        """Variational distribution over the latent variables."""
         hparams = self._hparams
-        core = feedback_rnn_core.FeedbackCore(
-            util.make_rnn(hparams, name='gen_core'),
-            _GenRNNFeedbackEncoder(hparams, self._obs_encoder),
-            _GenRNNFeedbackDecoder(hparams, self._obs_decoder, feedback=feedback))
-        (samples, log_probs), _ = tf.nn.dynamic_rnn(
-            core, (context, z, observed),
-            initial_state=core.initial_state(hparams.batch_size, trainable=True))
-        return samples, util.squeeze_sum(log_probs)
-
-
-class _GenRNNFeedbackEncoder(snt.AbstractModule):
-    def __init__(self, hparams, obs_encoder, name=None):
-        super(_GenRNNFeedbackEncoder, self).__init__(
-            name or self.__class__.__name__)
-        self._hparams = hparams
-        self._obs_encoder = obs_encoder
-
-    def _build(self, (context, z, observed), feedback):
-        inner_input = tf.concat([self._obs_encoder(feedback), context, z], axis=1)
-        decoder_state = observed
-        return inner_input, decoder_state
-
-
-class _GenRNNFeedbackDecoder(snt.AbstractModule):
-    def __init__(self, hparams, obs_decoder, feedback, name=None):
-        super(_GenRNNFeedbackDecoder, self).__init__(
-            name or self.__class__.__name__)
-        self._hparams = hparams
-        self._obs_decoder = obs_decoder
-        self._feedback = feedback
-
-    @property
-    def output_size(self):
-        hparams = self._hparams
-        outputs = (tf.TensorShape(hparams.obs_shape),  # sample
-                   tf.TensorShape([1]))                # log_prob(observed)
-        feedback = tf.TensorShape(hparams.obs_shape)
-        return outputs, feedback
-
-    def _build(self, inner_output, observed):
-        p_x = self._obs_decoder.dist(inner_output)
-        sample = p_x.sample()
-        log_prob = tf.expand_dims(p_x.log_prob(observed), 1)
-        feedback = sample if self._feedback else observed
-        return (sample, log_prob), feedback
-
-
-class _InfRNN(snt.AbstractModule):
-    """Context, observed -> q(state) distribution."""
-    def __init__(self, hparams, obs_encoder, name=None):
-        super(_InfRNN, self).__init__(
-            name or self.__class__.__name__)
-        self._hparams = hparams
-        self._obs_encoder = obs_encoder
-
-    def _build(self, context, observed):
-        hparams = self._hparams
-        enc_obs = snt.BatchApply(self._obs_encoder, n_dims=2)(observed)
-        inputs = tf.concat([context, enc_obs], axis=2)
+        inputs = util.concat_features([context, enc_observed])
         fwd_core = util.make_rnn(hparams, name='inf_fwd_core')
         inputs, _ = tf.nn.dynamic_rnn(
             fwd_core, inputs,
@@ -151,52 +56,77 @@ class _InfRNN(snt.AbstractModule):
                 hparams.batch_size, trainable=True))
         inputs = util.activation(hparams)(inputs)
         latent_dec = latent.LatentDecoder(hparams, name='q_z')
-        return IndependentSequence(
+        return iseq_dist.IndependentSequence(
             latent_dec.output_dist(
                 snt.BatchApply(latent_dec, n_dims=2)(inputs),
                 name='q_z_dist'))
 
+    def _build_vae(self, context, observed, enc_observed):
+        hparams = self._hparams
+        obs_encoder = self._obs_encoder
+        obs_decoder = self._obs_decoder
 
-class IndependentSequence(distributions.Distribution):
-    """Wrapper distribution consisting of a sequence of independent events."""
+        d_core = util.make_rnn(hparams, name='d_core')
+        p_z = self._prior_latent()
+        q_z = self._inferred_latent(context, enc_observed)
 
-    def __init__(self, item_dist, name=None):
-        name = (name or self.__class__.__name__) + item_dist.name
-        super(IndependentSequence, self).__init__(
-            dtype=item_dist.dtype,
-            reparameterization_type=item_dist.reparameterization_type,
-            validate_args=item_dist.validate_args,
-            allow_nan_stats=item_dist.allow_nan_stats,
-            name=name)
-        self._item_dist = item_dist
+        # Generative model.
+        gen_z = p_z.sample()
+        gen_core = _GenCore(hparams, d_core, obs_encoder, obs_decoder)
+        (d_initial, x0) = gen_initial = gen_core.initial_state(
+            hparams.batch_size, trainable=True)
+        (gen_x, gen_log_probs), _ = tf.nn.dynamic_rnn(
+            gen_core, (context, gen_z, observed), initial_state=gen_initial)
+        gen_log_prob = util.squeeze_sum(gen_log_probs)
 
-    def _batch_shape(self):
-        return self._item_dist.batch_shape[:-1]
+        # Inference model.
+        inf_z = q_z.sample()
+        prev_enc_observed = tf.concat([
+            tf.expand_dims(obs_encoder(x0), 1),
+            enc_observed[:, :-1, :],
+        ], axis=1)
+        inf_d, _ = tf.nn.dynamic_rnn(
+            d_core,
+            util.concat_features([prev_enc_observed, context, inf_z]),
+            initial_state=d_initial)
+        inf_p_x = iseq_dist.IndependentSequence(
+            obs_decoder.output_dist(
+                snt.BatchApply(obs_decoder, n_dims=2)(inf_d),
+                name='p_x_dist'))
+        inf_x = inf_p_x.sample()
+        inf_log_prob = inf_p_x.log_prob(observed)
+        inf_kl = util.calc_kl(hparams, inf_z, q_z, p_z)
 
-    def _batch_shape_tensor(self):
-        return self._item_dist.batch_shape_tensor()[:-1]
-
-    def _event_shape(self):
-        return (self._item_dist.batch_shape[-1:]
-                .concatenate(self._item_dist.event_shape))
-
-    def _event_shape_tensor(self):
-        return tf.concat([self._item_dist.batch_shape_tensor()[-1:],
-                          self._item_dist.event_shape_tensor()], axis=0)
-
-    def _log_prob(self, x):
-        return tf.reduce_sum(self._item_dist.log_prob(x), axis=-1)
-
-    def _prob(self, x):
-        return tf.reduce_prod(self._item_dist.prob(x), axis=-1)
-
-    def sample(self, *args, **kwargs):
-        return self._item_dist.sample(*args, **kwargs)
+        return util.VAETensors(
+            gen_z, gen_x, gen_log_prob,
+            inf_z, inf_x, inf_log_prob, inf_kl)
 
 
-@distributions.RegisterKL(IndependentSequence, IndependentSequence)
-def _kl_independent_seq(dist_a, dist_b, name=None):
-    name = name or 'KL_independent_seqs'
-    with tf.name_scope(name):
-        item_kl = distributions.kl(dist_a._item_dist, dist_b._item_dist)
-        return tf.reduce_sum(item_kl, axis=-1)
+class _GenCore(snt.RNNCore):
+    def __init__(self, hparams, d_core, obs_encoder, obs_decoder, name=None):
+        super(_GenCore, self).__init__(name or self.__class__.__name__)
+        self._hparams = hparams
+        self._d_core = d_core
+        self._obs_encoder = obs_encoder
+        self._obs_decoder = obs_decoder
+
+    @property
+    def state_size(self):
+        hparams = self._hparams
+        return (self._d_core.state_size,
+                tf.TensorShape(hparams.obs_shape))  # prev_x
+
+    @property
+    def output_size(self):
+        hparams = self._hparams
+        return (tf.TensorShape(hparams.obs_shape),  # x ~ p(x | z)
+                tf.TensorShape([1]))                # log p(x = observed | z)
+
+    def _build(self, (context, gen_z, observed), (d_state, prev_sample)):
+        enc_prev_sample = self._obs_encoder(prev_sample)
+        d_input = util.concat_features([enc_prev_sample, context, gen_z])
+        gen_d, d_state = self._d_core(d_input, d_state)
+        gen_p_x = self._obs_decoder.dist(gen_d)
+        sample = gen_p_x.sample()
+        log_prob = tf.expand_dims(gen_p_x.log_prob(observed), 1)
+        return (sample, log_prob), (d_state, sample)
