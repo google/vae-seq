@@ -7,8 +7,8 @@ def _defaults():
     # Size of encoded (flat) observations
     enc_obs_size = 128
 
-    # Number of hidden state units per time step
-    state_size = 32
+    # Number of latent units per time step
+    latent_size = 32
 
     # Model parameters
     obs_encoder_fc_layers = [256]

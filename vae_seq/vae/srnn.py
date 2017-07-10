@@ -97,15 +97,15 @@ class _GenCore(snt.RNNCore):
     def state_size(self):
         hparams = self._hparams
         return (self._d_core.state_size,
-                tf.TensorShape(hparams.state_size),  # prev_z
-                tf.TensorShape(hparams.obs_shape))   # prev_x
+                tf.TensorShape(hparams.latent_size),  # prev_z
+                tf.TensorShape(hparams.obs_shape))    # prev_x
 
     @property
     def output_size(self):
         hparams = self._hparams
-        return (tf.TensorShape(hparams.state_size),  # z ~ p(z)
-                tf.TensorShape(hparams.obs_shape),   # x ~ p(x | z)
-                tf.TensorShape([1]))                 # log p(x = observed | z)
+        return (tf.TensorShape(hparams.latent_size),  # z ~ p(z)
+                tf.TensorShape(hparams.obs_shape),    # x ~ p(x | z)
+                tf.TensorShape([1]))                  # log p(x = observed | z)
 
     def _build(self, (context, observed), (d_state, prev_z, prev_x)):
         hparams = self._hparams
@@ -130,15 +130,15 @@ class _InfCore(snt.RNNCore):
 
     @property
     def state_size(self):
-        return tf.TensorShape(self._hparams.state_size)  # prev_z
+        return tf.TensorShape(self._hparams.latent_size)  # prev_z
 
     @property
     def output_size(self):
         hparams = self._hparams
-        return (tf.TensorShape(hparams.state_size),  # z ~ q(z | d, e, prev_z)
-                tf.TensorShape(hparams.obs_shape),   # x ~ p(x | z)
-                tf.TensorShape([1]),                 # log prob(observed | z)
-                tf.TensorShape([1]))                 # kl(q(z) || p(z))
+        return (tf.TensorShape(hparams.latent_size),  # z ~ q(z | d, e, prev_z)
+                tf.TensorShape(hparams.obs_shape),    # x ~ p(x | z)
+                tf.TensorShape([1]),                  # log prob(observed | z)
+                tf.TensorShape([1]))                  # kl(q(z) || p(z))
 
     def _build(self, (d, e, observed), prev_z):
         hparams = self._hparams

@@ -33,7 +33,7 @@ class IndependentSequenceVAE(base.VAEBase):
     def _prior_latent(self):
         """Prior distribution over the latent variables."""
         hparams = self._hparams
-        dims = [hparams.batch_size, hparams.sequence_size, hparams.state_size]
+        dims = [hparams.batch_size, hparams.sequence_size, hparams.latent_size]
         return iseq_dist.IndependentSequence(
             distributions.MultivariateNormalDiag(
                 loc=tf.zeros(dims),

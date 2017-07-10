@@ -16,18 +16,18 @@ class LatentDecoder(snt.AbstractModule):
     @property
     def output_size(self):
         hparams = self._hparams
-        return (tf.TensorShape([hparams.state_size]),
-                tf.TensorShape([hparams.state_size]))
+        return (tf.TensorShape([hparams.latent_size]),
+                tf.TensorShape([hparams.latent_size]))
 
     def _build(self, *inputs):
         hparams = self._hparams
         mlp = util.make_mlp(
             hparams,
-            hparams.latent_decoder_fc_layers + [hparams.state_size * 2])
+            hparams.latent_decoder_fc_layers + [hparams.latent_size * 2])
         dist_params = mlp(util.concat_features(inputs))
-        loc = dist_params[:, :hparams.state_size]
+        loc = dist_params[:, :hparams.latent_size]
         scale = util.positive_projection(hparams)(
-            dist_params[:, hparams.state_size:])
+            dist_params[:, hparams.latent_size:])
         return (loc, scale)
 
     @staticmethod
