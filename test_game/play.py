@@ -1,3 +1,5 @@
+"""Play the test game using a trained model."""
+
 import tensorflow as tf
 from test_game import model
 

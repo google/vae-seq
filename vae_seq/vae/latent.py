@@ -13,12 +13,6 @@ class LatentDecoder(snt.AbstractModule):
         super(LatentDecoder, self).__init__(name or self.__class__.__name__)
         self._hparams = hparams
 
-    @property
-    def output_size(self):
-        hparams = self._hparams
-        return (tf.TensorShape([hparams.latent_size]),
-                tf.TensorShape([hparams.latent_size]))
-
     def _build(self, *inputs):
         hparams = self._hparams
         mlp = util.make_mlp(
@@ -32,11 +26,14 @@ class LatentDecoder(snt.AbstractModule):
 
     @staticmethod
     def output_dist((loc, scale_diag), name=None):
+        """Constructs a Distrubution from the output of the module."""
         return distributions.MultivariateNormalDiag(loc, scale_diag, name=name)
 
     def dist(self, *inputs):
+        """Returns p(latent | inputs)."""
         return self.output_dist(self(*inputs), name=self.module_name + "Dist")
 
     @property
     def event_dtype(self):
+        """The data type of the latent variables."""
         return tf.float32

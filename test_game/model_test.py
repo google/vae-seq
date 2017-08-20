@@ -9,6 +9,7 @@ def _hparams(vae_type):
     hparams.check_numerics = True
     return hparams
 
+
 class ModelTest(tf.test.TestCase):
 
     def _test_training(self, vae_type):
@@ -26,28 +27,27 @@ class ModelTest(tf.test.TestCase):
     def _test_generating(self, vae_type):
         hparams = _hparams(vae_type)
         vae = model.make_vae(hparams)
-        env_inputs, latents, generated = model.gen_graph(
-            hparams, vae)
+        env_inputs, latents, generated = model.gen_graph(hparams, vae)
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             sess.run([env_inputs, latents, generated])
 
-    def testTrainingISEQ(self):
+    def test_training_iseq(self):
         self._test_training("ISEQ")
 
-    def testGeneratingISEQ(self):
+    def test_generating_iseq(self):
         self._test_generating("ISEQ")
 
-    def testTrainingRNN(self):
+    def test_training_rnn(self):
         self._test_training("RNN")
 
-    def testGeneratingRNN(self):
+    def test_generating_rnn(self):
         self._test_generating("RNN")
 
-    def testTrainingSRNN(self):
+    def test_training_srnn(self):
         self._test_training("SRNN")
 
-    def testGeneratingSRNN(self):
+    def test_generating_srnn(self):
         self._test_generating("SRNN")
 
 

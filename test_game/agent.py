@@ -13,6 +13,7 @@ class Agent(agent_mod.Agent):
     interactive mode) as well as an encoding of the previous
     observation.
     """
+
     def __init__(self, hparams, obs_encoder, name=None):
         super(Agent, self).__init__(name or self.__class__.__name__)
         self.interactive = False
@@ -31,32 +32,33 @@ class Agent(agent_mod.Agent):
 
     @property
     def state_size(self):
-        return (tf.TensorShape([]),             # selected action.
-                self._inner_agent.state_size,)  # inner agent state.
+        return (
+            tf.TensorShape([]),  # selected action.
+            self._inner_agent.state_size,)  # inner agent state.
 
     @property
     def state_dtype(self):
         return (tf.int32, self._inner_agent.state_dtype)
 
     def initial_state(self, batch_size):
-        return (tf.zeros([batch_size], dtype=tf.int32),  # NOOPs.
-                self._inner_agent.initial_state(batch_size),)
+        return (
+            tf.zeros([batch_size], dtype=tf.int32),  # NOOPs.
+            self._inner_agent.initial_state(batch_size),)
 
     def observe(self, agent_input, observation, state):
         hparams = self._hparams
         _unused_prev_action, inner_state = state
         if not self.interactive:
             actions = tf.random_uniform(
-                [hparams.batch_size], 0, len(game_mod.ACTIONS),
-                dtype=tf.int32)
+                [hparams.batch_size], 0, len(game_mod.ACTIONS), dtype=tf.int32)
         else:
             single_action, = tf.py_func(
                 input_action, [observation[0, :]], [tf.int32])
             single_action.set_shape([])
-            actions = tf.tile(tf.expand_dims(single_action, 0),
-                              [hparams.batch_size])
-        inner_state = self._inner_agent.observe(
-            agent_input, observation, inner_state)
+            actions = tf.tile(
+                tf.expand_dims(single_action, 0), [hparams.batch_size])
+        inner_state = self._inner_agent.observe(agent_input, observation,
+                                                inner_state)
         return (actions, inner_state)
 
     def context(self, agent_input, state):
@@ -83,8 +85,8 @@ class Agent(agent_mod.Agent):
 def input_action(obs):
     print "OBSERVATION:", list(obs)
     action_menu = ("[" + ", ".join(
-        [str(i) + ": " + action for (i, action)
-         in enumerate(game_mod.ACTIONS)]) + "]")
+        [str(i) + ": " + action
+         for (i, action) in enumerate(game_mod.ACTIONS)]) + "]")
     while True:
         try:
             action = np.int32(

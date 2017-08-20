@@ -5,6 +5,7 @@ from vae_seq import agent as agent_mod
 
 
 class TestEnvironment(snt.RNNCore):
+
     @property
     def output_size(self):
         return tf.TensorShape([1])
@@ -25,6 +26,7 @@ class TestEnvironment(snt.RNNCore):
 
 
 class IdentityObsEncoder(snt.AbstractModule):
+
     @property
     def output_size(self):
         return tf.TensorShape([1])
@@ -34,6 +36,7 @@ class IdentityObsEncoder(snt.AbstractModule):
 
 
 class AgentTest(tf.test.TestCase):
+
     def test_null_inputs(self):
         with self.test_session() as sess:
             self.assertAllEqual(

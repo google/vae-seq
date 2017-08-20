@@ -36,16 +36,16 @@ Step 3.
   Buffer:      [1, 0, 1, 0]
   Position:           ^
   Observation: [0, 1, 0]
-""" 
+"""
 
 import numpy as np
-
 
 ACTIONS = ["NOOP", "RIGHT", "LEFT", "UP", "DOWN"]
 (NOOP, RIGHT, LEFT, UP, DOWN) = range(len(ACTIONS))
 
 
 class Game(object):
+
     def __init__(self, width, classes):
         self.width = width
         self.classes = classes

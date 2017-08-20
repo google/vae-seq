@@ -1,22 +1,29 @@
+"""Basic tests for all of the VAE implementations."""
+
 import tensorflow as tf
 
 from vae_seq import agent as agent_mod
 from vae_seq import hparams as hparams_mod
 from vae_seq import obs_layers
-from vae_seq import util
 from vae_seq import vae as vae_mod
 
+
 def _build_vae(hparams):
+    """Constructs a VAE."""
     obs_encoder = obs_layers.ObsEncoder(hparams)
     obs_decoder = obs_layers.ObsDecoder(hparams)
     agent = agent_mod.EncodeObsAgent(obs_encoder)
     return vae_mod.make(hparams, agent, obs_encoder, obs_decoder)
 
+
 def _observed(hparams):
+    """Test observations."""
     return tf.zeros([hparams.batch_size, hparams.sequence_size] +
                     hparams.obs_shape, dtype=tf.int32)
 
-def _train_tensors(hparams, vae):
+
+def _inf_tensors(hparams, vae):
+    """Simple inference graph."""
     observed = _observed(hparams)
     agent_inputs = agent_mod.null_inputs(
         hparams.batch_size, hparams.sequence_size)
@@ -27,7 +34,9 @@ def _train_tensors(hparams, vae):
     elbo = tf.reduce_sum(log_probs - divs)
     return [observed, latents, divs, log_probs, elbo]
 
+
 def _gen_tensors(hparams, gen_core):
+    """Samples observations and latent variables from the VAE."""
     agent_inputs = agent_mod.null_inputs(
         hparams.batch_size, hparams.sequence_size)
     initial_state = gen_core.initial_state(hparams.batch_size)
@@ -38,10 +47,10 @@ def _gen_tensors(hparams, gen_core):
         dtype=gen_core.output_dtype)
     return [generated, sampled_latents]
 
-def _all_tensors(hparams, vae):
-    train_tensors = _train_tensors(hparams, vae)
-    gen_tensors = _gen_tensors(hparams, vae.gen_core)
-    observed, latents, divs, log_probs, elbo = train_tensors
+
+def _test_assertions(inf_tensors, gen_tensors):
+    """Returns in-graph assertions for testing."""
+    observed, latents, divs, log_probs, elbo = inf_tensors
     generated, sampled_latents = gen_tensors
     assertions = [
         tf.assert_equal(
@@ -66,21 +75,32 @@ def _all_tensors(hparams, vae):
             tf.shape(generated)[:2], tf.shape(sampled_latents)[:2],
             message="Batch & steps: generated vs sampled latents"),
     ]
-    vars = tf.trainable_variables()
-    grads = tf.gradients(-elbo, vars)
-    for (v, g) in zip(vars, grads):
-        assertions.append(tf.check_numerics(g, "Gradient for " + v.name))
-    return train_tensors, gen_tensors, assertions
+    vars_ = tf.trainable_variables()
+    grads = tf.gradients(-elbo, vars_)
+    for (var, grad) in zip(vars_, grads):
+        assertions.append(tf.check_numerics(grad, "Gradient for " + var.name))
+    return assertions
+
+
+def _all_tensors(hparams, vae):
+    """All tensors to evaluate in tests."""
+    inf_tensors = _inf_tensors(hparams, vae)
+    gen_tensors = _gen_tensors(hparams, vae.gen_core)
+    assertions = _test_assertions(inf_tensors, gen_tensors)
+    return inf_tensors, gen_tensors, assertions
 
 
 class VAETest(tf.test.TestCase):
+    """Tests for VAEBase implementations."""
+
     def _test_vae(self, vae_type):
+        """Make sure that all tensors and assertions evaluate without error."""
         hparams = hparams_mod.HParams(obs_shape=[2], vae_type=vae_type)
         vae = _build_vae(hparams)
-        train_tensors, gen_tensors, assertions = _all_tensors(hparams, vae)
+        inf_tensors, gen_tensors, assertions = _all_tensors(hparams, vae)
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
-            sess.run(train_tensors + gen_tensors + assertions)
+            sess.run(inf_tensors + gen_tensors + assertions)
 
     def test_iseq(self):
         self._test_vae("ISEQ")

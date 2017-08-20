@@ -1,4 +1,21 @@
-import sonnet as snt
+"""We can view an RNN as a VAE with no latent variables:
+
+Notation:
+ - d_1:T are the (deterministic) RNN outputs.
+ - x_1:T are the observed states.
+ - c_1:T are per-timestep contexts.
+
+        Generative model
+      =====================
+      x_1               x_t
+       ^                 ^
+       |                 |
+      d_1 ------------> d_t
+       ^                 ^
+       |                 |
+      c_1               c_t
+"""
+
 import tensorflow as tf
 from tensorflow.contrib import distributions
 
@@ -6,37 +23,20 @@ from . import base
 from .. import util
 
 class RNN(base.VAEBase):
-    """We can view an RNN as a VAE with no latent variables:
+    """Implementation of an RNN as a fake sequential VAE."""
 
-    Notation:
-     - d_1:T are the (deterministic) RNN outputs.
-     - x_1:T are the observed states.
-     - c_1:T are per-timestep contexts.
+    def __init__(self, hparams, agent, obs_encoder, obs_decoder, name=None):
+        self._hparams = hparams
+        self._obs_encoder = obs_encoder
+        self._obs_decoder = obs_decoder
+        super(RNN, self).__init__(agent, name)
 
-            Generative model
-          =====================
-          x_1               x_t
-           ^                 ^
-           |                 |
-          d_1 ------------> d_t
-           ^                 ^
-           |                 |
-          c_1               c_t
-    """
-
-    def _allocate(self):
+    def _init_submodules(self):
         hparams = self._hparams
         self._d_core = util.make_rnn(hparams, name="d_core")
-        self._z_distcore = NoLatents(hparams)
-        self._x_distcore = ObsDist(hparams, self._d_core, self._obs_decoder)
-
-    @property
-    def latent_prior_distcore(self):
-        return self._z_distcore
-
-    @property
-    def observed_distcore(self):
-        return self._x_distcore
+        self._latent_prior_distcore = NoLatents(hparams)
+        self._observed_distcore = ObsDist(
+            hparams, self._d_core, self._obs_decoder)
 
     def infer_latents(self, contexts, observed):
         batch_size, length = tf.unstack(tf.shape(observed)[:2])
@@ -48,6 +48,8 @@ class RNN(base.VAEBase):
 
 
 class ObsDist(base.DistCore):
+    """DistCore for producing p(observation | context, latent)."""
+
     def __init__(self, hparams, d_core, obs_decoder, name=None):
         super(ObsDist, self).__init__(name or self.__class__.__name__)
         self._hparams = hparams
@@ -66,15 +68,18 @@ class ObsDist(base.DistCore):
     def event_dtype(self):
         return self._obs_decoder.event_dtype
 
-    def _build_dist(self, (context, z), d_state):
-        d, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._obs_decoder.dist(d), d_state
+    def _build_dist(self, (context, latent), d_state):
+        del latent  # The latent variable is empty (has zero size).
+        d_out, d_state = self._d_core(util.concat_features(context), d_state)
+        return self._obs_decoder.dist(d_out), d_state
 
     def _next_state(self, d_state, event=None):
         return d_state
 
 
 class NoEventsDist(distributions.Distribution):
+    """A partial implementation of dirac(null-event)."""
+
     def __init__(self, batch_shape, dtype=tf.float32, name=None):
         super(NoEventsDist, self).__init__(
             dtype=dtype,
@@ -93,6 +98,8 @@ class NoEventsDist(distributions.Distribution):
 
 
 class NoLatents(base.DistCore):
+    """DistCore that samples an empty latent state."""
+
     def __init__(self, hparams, name=None):
         super(NoLatents, self).__init__(name or self.__class__.__name__)
         self._hparams = hparams
@@ -110,6 +117,7 @@ class NoLatents(base.DistCore):
         return tf.float32
 
     def _build_dist(self, context, state):
+        del context, state  # The latent distribution is constant.
         hparams = self._hparams
         dist = NoEventsDist([hparams.batch_size])
         return dist, ()

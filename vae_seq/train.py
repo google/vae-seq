@@ -1,9 +1,11 @@
+"""Training subgraph for a VAE."""
+
 import sonnet as snt
 import tensorflow as tf
 
 
 class TrainOps(snt.AbstractModule):
-    """Training subgraph for a VAE."""
+    """This module produces a train_op given Agent contexts and observations."""
 
     def __init__(self, hparams, vae, name=None):
         super(TrainOps, self).__init__(name or self.__class__.__name__)

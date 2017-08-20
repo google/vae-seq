@@ -76,9 +76,8 @@ class EncodeObsAgent(Agent):
         return tf.float32
 
     def initial_state(self, batch_size):
-        return tf.zeros(
-            [batch_size] +
-            tf.TensorShape(self._obs_encoder.output_size).as_list())
+        return tf.zeros([batch_size] +
+                        tf.TensorShape(self._obs_encoder.output_size).as_list())
 
     def observe(self, agent_input, observation, state):
         return self._obs_encoder(observation)
@@ -96,10 +95,12 @@ def contexts_for_static_observations(observations, agent, agent_inputs):
     """Generate contexts for a static sequence of observations."""
     batch_size = tf.shape(agent_inputs)[0]
     initial_state = agent.initial_state(batch_size)
+
     def _step((agent_input, obs), state):
         context = agent.context(agent_input, state)
         state = agent.observe(agent_input, obs, state)
         return context, state
+
     contexts, _ = tf.nn.dynamic_rnn(
         util.WrapRNNCore(_step, agent.state_size, agent.context_size),
         (agent_inputs, observations),
@@ -113,12 +114,14 @@ def contexts_and_observations_from_environment(env, agent, agent_inputs):
     batch_size = tf.shape(agent_inputs)[0]
     initial_state = (agent.initial_state(batch_size),
                      env.initial_state(batch_size))
+
     def _step(agent_input, (agent_state, env_state)):
         context = agent.context(agent_input, agent_state)
         env_input = agent.env_input(agent_input, agent_state)
         obs, env_state = env(env_input, env_state)
         agent_state = agent.observe(agent_input, obs, agent_state)
         return (context, obs), (agent_state, env_state)
+
     (contexts, observations), _ = tf.nn.dynamic_rnn(
         util.WrapRNNCore(
             _step,

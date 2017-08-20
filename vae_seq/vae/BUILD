@@ -61,6 +61,5 @@ py_test(
         "//vae_seq:agent",
         "//vae_seq:hparams",
         "//vae_seq:obs_layers",
-        "//vae_seq:util",
     ],
 )
