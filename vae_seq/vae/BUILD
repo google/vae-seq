@@ -20,15 +20,17 @@ py_library(
     deps = [
         ":base",
         ":latent",
-        ":independent_sequence_distribution",
         "//vae_seq:util",
     ],
 )
 
 py_library(
-    name = "independent_sequence_distribution",
-    srcs = ["independent_sequence_distribution.py"],
-    deps = [],
+    name = "rnn",
+    srcs = ["rnn.py"],
+    deps = [
+        ":base",
+        "//vae_seq:util",
+    ],
 )
 
 py_library(
@@ -46,6 +48,7 @@ py_library(
     srcs = ["__init__.py"],
     deps = [
         ":independent_sequence",
+        ":rnn",
         ":srnn",
     ],
 )
@@ -55,6 +58,7 @@ py_test(
     srcs = ["vae_test.py"],
     deps = [
         ":vae",
+        "//vae_seq:agent",
         "//vae_seq:hparams",
         "//vae_seq:obs_layers",
         "//vae_seq:util",

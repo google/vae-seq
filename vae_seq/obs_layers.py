@@ -22,7 +22,7 @@ class ObsEncoder(snt.AbstractModule):
         mlp = util.make_mlp(
             hparams,
             hparams.obs_encoder_fc_layers + [self.output_size.num_elements()])
-        return mlp(snt.BatchFlatten()(obs))
+        return mlp(snt.BatchFlatten()(tf.to_float(obs)))
 
 
 class ObsDecoder(snt.AbstractModule):
@@ -49,7 +49,11 @@ class ObsDecoder(snt.AbstractModule):
     @staticmethod
     def output_dist(logits, name=None):
         return distributions.OneHotCategorical(
-            logits=logits, dtype=tf.float32, name=name)
+            logits=logits, dtype=tf.int32, name=name)
 
     def dist(self, *inputs):
-        return self.output_dist(self(*inputs), name=self.module_name + 'Dist')
+        return self.output_dist(self(*inputs), name=self.module_name + "Dist")
+
+    @property
+    def event_dtype(self):
+        return tf.int32

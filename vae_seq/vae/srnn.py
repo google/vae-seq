@@ -7,7 +7,6 @@ from . import base
 from . import latent
 from .. import util
 
-
 class SRNN(base.VAEBase):
     r""""SRNN as described in:
 
@@ -32,125 +31,113 @@ class SRNN(base.VAEBase):
           d_1 -----> d_t               d_1 ---------> d_t
            ^          ^                 ^              ^
            |          |                 |              |
-       [x_0, c_1] [x_t-1, c_t]     [x_0, c_1]    [x_t-1, c_t]
+          c_1        c_t               c_1            c_t
     """
 
-    def _build_vae(self, context, observed, enc_observed):
+    def _allocate(self):
         hparams = self._hparams
-        obs_encoder = self._obs_encoder
-        obs_decoder = self._obs_decoder
+        self._d_core = util.make_rnn(hparams, name="d_core")
+        self._e_core = util.make_rnn(hparams, name="e_core")
+        self._latent_p = latent.LatentDecoder(hparams, name="latent_p")
+        self._latent_q = latent.LatentDecoder(hparams, name="latent_q")
+        self._z_distcore = LatentPrior(hparams, self._d_core, self._latent_p)
+        self._x_distcore = ObsDist(hparams, self._d_core, self._obs_decoder)
 
-        d_core = util.make_rnn(hparams, name='d_core')
-        e_core = util.make_rnn(hparams, name='e_core')
-        latent_p = latent.LatentDecoder(hparams, name='latent_p')
-        latent_q = latent.LatentDecoder(hparams, name='latent_q')
+    @property
+    def latent_prior_distcore(self):
+        return self._z_distcore
 
-        # Generative model.
-        gen_core = _GenCore(hparams, d_core, obs_encoder, obs_decoder, latent_p)
-        (d_initial, z0, x0) = gen_initial = gen_core.initial_state(
-            hparams.batch_size, trainable=True)
-        (gen_z, gen_x, gen_log_probs), _ = tf.nn.dynamic_rnn(
-            gen_core,
-            (context, observed),
-            initial_state=gen_initial)
+    @property
+    def observed_distcore(self):
+        return self._x_distcore
 
-        # Bottom part of the inference model.
-        prev_enc_observed = tf.concat([
-            tf.expand_dims(obs_encoder(x0), 1),
-            enc_observed[:, :-1, :],
-        ], axis=1)
-        inf_d, _ = tf.nn.dynamic_rnn(
-            d_core,
-            util.concat_features([prev_enc_observed, context]),
+    def infer_latents(self, contexts, observed):
+        hparams = self._hparams
+        z_initial, d_initial = self._z_distcore.samples.initial_state(
+            hparams.batch_size)
+        ds, _ = tf.nn.dynamic_rnn(
+            self._d_core,
+            util.concat_features(contexts),
             initial_state=d_initial)
-        inf_e, _ = util.reverse_dynamic_rnn(
-            e_core,
-            util.concat_features([enc_observed, inf_d]),
-            initial_state=e_core.initial_state(
-                hparams.batch_size, trainable=True))
+        enc_observed = snt.BatchApply(self._obs_encoder, n_dims=2)(observed)
+        es, _ = util.reverse_dynamic_rnn(
+            self._e_core,
+            util.concat_features((enc_observed, contexts)),
+            initial_state=self._e_core.initial_state(hparams.batch_size))
 
-        # Top part of the inference model.
-        inf_core = _InfCore(hparams, obs_decoder, latent_p, latent_q)
-        (inf_z, inf_x, inf_log_probs, inf_kls), _ = tf.nn.dynamic_rnn(
+        def _inf_step((d, e), prev_z):
+            p_z = self._latent_p.dist(d, prev_z)
+            q_loc, q_scale = self._latent_q(e, prev_z)
+            if hparams.srnn_use_res_q:
+                q_loc += p_z.loc
+            q_z = self._latent_q.output_dist((q_loc, q_scale), name="q_z_dist")
+            z = q_z.sample()
+            kl = util.calc_kl(hparams, z, q_z, p_z)
+            return (z, kl), z
+        inf_core = util.WrapRNNCore(
+            _inf_step,
+            state_size=tf.TensorShape(hparams.latent_size),    # prev_z
+            output_size=(tf.TensorShape(hparams.latent_size),  # z
+                         tf.TensorShape([]),),                 # divergence
+            name="inf_z_core")
+        (zs, kls), _ = tf.nn.dynamic_rnn(
             inf_core,
-            (inf_d, inf_e, observed),
-            initial_state=z0)
-
-        return util.VAETensors(
-            gen_z, gen_x, util.squeeze_sum(gen_log_probs),
-            inf_z, inf_x, util.squeeze_sum(inf_log_probs),
-            util.squeeze_sum(inf_kls),
-        )
+            (ds, es),
+            initial_state=z_initial)
+        return zs, kls
 
 
-class _GenCore(snt.RNNCore):
-    def __init__(self, hparams, d_core, obs_encoder, obs_decoder, latent_p,
-                 name=None):
-        super(_GenCore, self).__init__(name or self.__class__.__name__)
+class ObsDist(base.DistCore):
+    def __init__(self, hparams, d_core, obs_decoder, name=None):
+        super(ObsDist, self).__init__(name or self.__class__.__name__)
         self._hparams = hparams
         self._d_core = d_core
-        self._obs_encoder = obs_encoder
         self._obs_decoder = obs_decoder
-        self._latent_p = latent_p
 
     @property
     def state_size(self):
-        hparams = self._hparams
-        return (self._d_core.state_size,
-                tf.TensorShape(hparams.latent_size),  # prev_z
-                tf.TensorShape(hparams.obs_shape))    # prev_x
+        return self._d_core.state_size
 
     @property
-    def output_size(self):
-        hparams = self._hparams
-        return (tf.TensorShape(hparams.latent_size),  # z ~ p(z)
-                tf.TensorShape(hparams.obs_shape),    # x ~ p(x | z)
-                tf.TensorShape([1]))                  # log p(x = observed | z)
+    def event_size(self):
+        return tf.TensorShape(self._hparams.obs_shape)
 
-    def _build(self, (context, observed), (d_state, prev_z, prev_x)):
-        hparams = self._hparams
-        d_input = util.concat_features([self._obs_encoder(prev_x), context])
-        d, d_state = self._d_core(d_input, d_state)
-        p_z = self._latent_p.dist(d, prev_z)
-        z = p_z.sample()
-        p_x = self._obs_decoder.dist(d, z)
-        x = p_x.sample()
-        log_prob = tf.expand_dims(p_x.log_prob(observed), axis=1)
-        return (z, x, log_prob), (d_state, z, x)
+    @property
+    def event_dtype(self):
+        return self._obs_decoder.event_dtype
+
+    def _build_dist(self, (context, z), d_state):
+        d, d_state = self._d_core(util.concat_features(context), d_state)
+        return self._obs_decoder.dist(d, z), d_state
+
+    def _next_state(self, d_state, event=None):
+        return d_state
 
 
-class _InfCore(snt.RNNCore):
-    """The top layer of the inference model."""
-    def __init__(self, hparams, obs_decoder, latent_p, latent_q, name=None):
-        super(_InfCore, self).__init__(name or self.__class__.__name__)
+class LatentPrior(base.DistCore):
+    def __init__(self, hparams, d_core, latent_p, name=None):
+        super(LatentPrior, self).__init__(name or self.__class__.__name__)
         self._hparams = hparams
-        self._obs_decoder = obs_decoder
+        self._d_core = d_core
         self._latent_p = latent_p
-        self._latent_q = latent_q
 
     @property
     def state_size(self):
-        return tf.TensorShape(self._hparams.latent_size)  # prev_z
+        return (tf.TensorShape(self._hparams.latent_size),  # prev_z
+                self._d_core.state_size,)                   # d state
 
     @property
-    def output_size(self):
-        hparams = self._hparams
-        return (tf.TensorShape(hparams.latent_size),  # z ~ q(z | d, e, prev_z)
-                tf.TensorShape(hparams.obs_shape),    # x ~ p(x | z)
-                tf.TensorShape([1]),                  # log prob(observed | z)
-                tf.TensorShape([1]))                  # kl(q(z) || p(z))
+    def event_size(self):
+        return tf.TensorShape(self._hparams.latent_size)
 
-    def _build(self, (d, e, observed), prev_z):
-        hparams = self._hparams
-        p_z = self._latent_p.dist(d, prev_z)
-        q_loc, q_scale = self._latent_q(e, prev_z)
-        if hparams.srnn_use_res_q:
-            q_loc += p_z.loc
-        q_z = self._latent_q.output_dist((q_loc, q_scale), name='q_z_dist')
-        z = q_z.sample()
-        p_x = self._obs_decoder.dist(d, z)
-        x = p_x.sample()
-        kl = tf.expand_dims(util.calc_kl(hparams, z, q_z, p_z), axis=1)
-        log_prob = tf.expand_dims(p_x.log_prob(observed), axis=1)
-        output = (z, x, log_prob, kl)
-        return output, z
+    @property
+    def event_dtype(self):
+        return self._latent_p.event_dtype
+
+    def _build_dist(self, context, state):
+        prev_z, d_state = state
+        d, d_state = self._d_core(util.concat_features(context), d_state)
+        return self._latent_p.dist(d, prev_z), d_state
+
+    def _next_state(self, d_state, event=None):
+        return (event, d_state)

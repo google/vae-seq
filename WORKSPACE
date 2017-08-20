@@ -1,1 +1,0 @@
-workspace(name = "vae_seq")

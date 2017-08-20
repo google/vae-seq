@@ -35,4 +35,8 @@ class LatentDecoder(snt.AbstractModule):
         return distributions.MultivariateNormalDiag(loc, scale_diag, name=name)
 
     def dist(self, *inputs):
-        return self.output_dist(self(*inputs), name=self.module_name + 'Dist')
+        return self.output_dist(self(*inputs), name=self.module_name + "Dist")
+
+    @property
+    def event_dtype(self):
+        return tf.float32

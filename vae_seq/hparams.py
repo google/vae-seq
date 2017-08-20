@@ -8,7 +8,7 @@ def _defaults():
     enc_obs_size = 128
 
     # Number of latent units per time step
-    latent_size = 32
+    latent_size = 4
 
     # Model parameters
     obs_encoder_fc_layers = [256]
@@ -33,11 +33,6 @@ def _defaults():
     sequence_size = 5
     learning_rate = 0.0001
     check_numerics = False
-    logdir = '/tmp/vae_seq'
-
-    # Test game parameters
-    test_game_width = 3
-    test_game_classes = 4
 
     return locals()
 

@@ -1,19 +1,6 @@
-import collections
 import sonnet as snt
 import tensorflow as tf
 from tensorflow.contrib import distributions
-
-
-VAETensors = collections.namedtuple('VAETensors', [
-    'gen_z',         # gen_z ~ p(gen_z)
-    'gen_x',         # gen_x ~ p(gen_x | gen_z)
-    'gen_log_prob',  # p(gen_x = obs | z)
-    'inf_z',         # inf_z ~ q(inf_z | obs)
-    'inf_x',         # inf_x ~ p(inf_x | inf_z) -- just for debugging.
-    'inf_log_prob',  # p(inf_x = obs | inf_z)
-    'inf_kl',        # kl(q(inf_z | obs) || p(z))
-])
-
 
 def calc_kl(hparams, q_sample, dist_q, dist_p):
     if hparams.use_monte_carlo_kl:
@@ -29,36 +16,55 @@ def reverse_dynamic_rnn(cell, inputs, time_major=False, **kwargs):
     return snt.nest.map(reverse_seq, output), state
 
 
-def squeeze_sum(x):
-    return tf.reduce_sum(tf.squeeze(x, axis=2), axis=1)
-
-
 def activation(hparams):
     return {
-        'relu': tf.nn.relu,
-        'elu': tf.nn.elu,
+        "relu": tf.nn.relu,
+        "elu": tf.nn.elu,
     }[hparams.activation]
 
 
 def positive_projection(hparams):
     return {
-        'exp': tf.exp,
-        'softplus': tf.nn.softplus,
+        "exp": tf.exp,
+        "softplus": tf.nn.softplus,
     }[hparams.positive_projection]
 
 
-def make_rnn(hparams, name=None):
-    return snt.DeepRNN(
-        [snt.LSTM(size) for size in hparams.rnn_hidden_sizes],
-        name=name or 'RNN')
+def make_rnn(hparams, name):
+    with tf.variable_scope(name):
+        return snt.DeepRNN(
+            [snt.LSTM(size) for size in hparams.rnn_hidden_sizes],
+            name=name)
 
 
 def make_mlp(hparams, layers, name=None):
     return snt.nets.MLP(
-        layers, activation=activation(hparams), name=name or 'MLP')
+        layers, activation=activation(hparams), name=name or "MLP")
 
 
-def concat_features(xs):
-    if len(xs) == 1:
-        return xs[0]
-    return tf.concat(xs, axis=-1)
+def concat_features(tensors):
+    tensors = snt.nest.flatten(tensors)
+    if len(tensors) == 1:
+        return tensors[0]
+    return tf.concat(tensors, axis=-1)
+
+
+class WrapRNNCore(snt.RNNCore):
+    """Wrap a transition function into an RNNCore."""
+
+    def __init__(self, step, state_size, output_size, name=None):
+        super(WrapRNNCore, self).__init__(name or self.__class__.__name__)
+        self._step = step
+        self._state_size = state_size
+        self._output_size = output_size
+
+    @property
+    def output_size(self):
+        return self._output_size
+
+    @property
+    def state_size(self):
+        return self._state_size
+
+    def _build(self, input_, state):
+        return self._step(input_, state)

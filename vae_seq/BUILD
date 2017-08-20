@@ -17,6 +17,22 @@ py_library(
 )
 
 py_library(
+    name = "agent",
+    srcs = ["agent.py"],
+    deps = [
+         ":util",
+    ],
+)
+
+py_test(
+    name = "agent_test",
+    srcs = ["agent_test.py"],
+    deps = [
+        ":agent",
+    ],
+)
+
+py_library(
     name = "obs_layers",
     srcs = ["obs_layers.py"],
     deps = [
@@ -25,9 +41,7 @@ py_library(
 )
 
 py_library(
-    name = "model",
-    srcs = ["model.py"],
-    deps = [
-        "//vae_seq/vae",
-    ],
+    name = "train",
+    srcs = ["train.py"],
+    deps = [],
 )
