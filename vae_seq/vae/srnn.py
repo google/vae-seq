@@ -39,7 +39,7 @@ class SRNN(base.VAEBase):
         self._hparams = hparams
         self._obs_encoder = obs_encoder
         self._obs_decoder = obs_decoder
-        super(SRNN, self).__init__(agent, name)
+        super(SRNN, self).__init__(agent, name=name)
 
     def _init_submodules(self):
         hparams = self._hparams
@@ -95,7 +95,7 @@ class ObsDist(base.DistCore):
     """DistCore for producing p(observation | context, latent)."""
 
     def __init__(self, hparams, d_core, obs_decoder, name=None):
-        super(ObsDist, self).__init__(name or self.__class__.__name__)
+        super(ObsDist, self).__init__(name=name)
         self._hparams = hparams
         self._d_core = d_core
         self._obs_decoder = obs_decoder
@@ -124,7 +124,7 @@ class LatentPrior(base.DistCore):
     """DistCore that produces Normal latent variables."""
 
     def __init__(self, hparams, d_core, latent_p, name=None):
-        super(LatentPrior, self).__init__(name or self.__class__.__name__)
+        super(LatentPrior, self).__init__(name=name)
         self._hparams = hparams
         self._d_core = d_core
         self._latent_p = latent_p

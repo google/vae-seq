@@ -43,7 +43,7 @@ class AgentTest(tf.test.TestCase):
                 sess.run(tf.shape(agent_mod.null_inputs(3, 5))), [3, 5, 0])
 
     def test_contexts_for_static_obs(self):
-        agent = agent_mod.EncodeObsAgent(IdentityObsEncoder("identity"))
+        agent = agent_mod.EncodeObsAgent(IdentityObsEncoder(name="identity"))
         obs = tf.constant([[[1.], [2.], [3.]],
                            [[4.], [5.], [6.]]])
         ctx = agent_mod.contexts_for_static_observations(
@@ -55,8 +55,8 @@ class AgentTest(tf.test.TestCase):
                  [[0.], [4.], [5.]]])
 
     def test_contexts_from_env(self):
-        env = TestEnvironment("test_env")
-        agent = agent_mod.EncodeObsAgent(IdentityObsEncoder("identity"))
+        env = TestEnvironment(name="test_env")
+        agent = agent_mod.EncodeObsAgent(IdentityObsEncoder(name="identity"))
         ctx, obs = agent_mod.contexts_and_observations_from_environment(
             env, agent, agent_mod.null_inputs(2, 3))
         ctx2 = agent_mod.contexts_for_static_observations(

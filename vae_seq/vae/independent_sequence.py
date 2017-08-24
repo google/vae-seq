@@ -74,7 +74,7 @@ class ObsDist(base.DistCore):
     """DistCore for producing p(observation | context, latent)."""
 
     def __init__(self, hparams, d_core, obs_decoder, name=None):
-        super(ObsDist, self).__init__(name or self.__class__.__name__)
+        super(ObsDist, self).__init__(name=name)
         self._hparams = hparams
         self._d_core = d_core
         self._obs_decoder = obs_decoder
@@ -103,7 +103,7 @@ class LatentPrior(base.DistCore):
     """DistCore that samples standard normal latents."""
 
     def __init__(self, hparams, name=None):
-        super(LatentPrior, self).__init__(name or self.__class__.__name__)
+        super(LatentPrior, self).__init__(name=name)
         self._hparams = hparams
         with self._enter_variable_scope():
             dims = [hparams.batch_size, hparams.latent_size]

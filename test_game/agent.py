@@ -15,7 +15,7 @@ class Agent(agent_mod.Agent):
     """
 
     def __init__(self, hparams, obs_encoder, name=None):
-        super(Agent, self).__init__(name or self.__class__.__name__)
+        super(Agent, self).__init__(name=name)
         self.interactive = False
         self._hparams = hparams
         with self._enter_variable_scope():

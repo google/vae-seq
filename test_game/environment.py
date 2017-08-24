@@ -9,7 +9,7 @@ from . import game as game_mod
 class Environment(snt.RNNCore):
 
     def __init__(self, hparams, name=None):
-        super(Environment, self).__init__(name or self.__class__.__name__)
+        super(Environment, self).__init__(name=name)
         self._hparams = hparams
 
     @property

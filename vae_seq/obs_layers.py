@@ -12,7 +12,7 @@ class ObsEncoder(snt.AbstractModule):
     """Observed -> encoded, flat observation."""
 
     def __init__(self, hparams, name=None):
-        super(ObsEncoder, self).__init__(name or self.__class__.__name__)
+        super(ObsEncoder, self).__init__(name=name)
         self._hparams = hparams
 
     @property
@@ -32,7 +32,7 @@ class ObsDecoder(snt.AbstractModule):
     """inputs -> P(observed | inputs)"""
 
     def __init__(self, hparams, name=None):
-        super(ObsDecoder, self).__init__(name or self.__class__.__name__)
+        super(ObsDecoder, self).__init__(name=name)
         self._hparams = hparams
 
     def _build(self, *inputs):

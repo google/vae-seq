@@ -63,7 +63,7 @@ class WrapRNNCore(snt.RNNCore):
     """Wrap a transition function into an RNNCore."""
 
     def __init__(self, step, state_size, output_size, name=None):
-        super(WrapRNNCore, self).__init__(name or self.__class__.__name__)
+        super(WrapRNNCore, self).__init__(name=name)
         self._step = step
         self._state_size = state_size
         self._output_size = output_size

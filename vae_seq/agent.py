@@ -55,7 +55,7 @@ class EncodeObsAgent(Agent):
     """Simple agent that encodes the previous observation as context."""
 
     def __init__(self, obs_encoder, name=None):
-        super(EncodeObsAgent, self).__init__(name or self.__class__.__name__)
+        super(EncodeObsAgent, self).__init__(name=name)
         self._obs_encoder = obs_encoder
 
     @property

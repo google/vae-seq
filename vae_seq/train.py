@@ -8,7 +8,7 @@ class TrainOps(snt.AbstractModule):
     """This module produces a train_op given Agent contexts and observations."""
 
     def __init__(self, hparams, vae, name=None):
-        super(TrainOps, self).__init__(name or self.__class__.__name__)
+        super(TrainOps, self).__init__(name=name)
         self._hparams = hparams
         self._vae = vae
 

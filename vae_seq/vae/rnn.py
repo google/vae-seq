@@ -29,7 +29,7 @@ class RNN(base.VAEBase):
         self._hparams = hparams
         self._obs_encoder = obs_encoder
         self._obs_decoder = obs_decoder
-        super(RNN, self).__init__(agent, name)
+        super(RNN, self).__init__(agent, name=name)
 
     def _init_submodules(self):
         hparams = self._hparams
@@ -51,7 +51,7 @@ class ObsDist(base.DistCore):
     """DistCore for producing p(observation | context, latent)."""
 
     def __init__(self, hparams, d_core, obs_decoder, name=None):
-        super(ObsDist, self).__init__(name or self.__class__.__name__)
+        super(ObsDist, self).__init__(name=name)
         self._hparams = hparams
         self._d_core = d_core
         self._obs_decoder = obs_decoder
@@ -86,7 +86,7 @@ class NoEventsDist(distributions.Distribution):
             reparameterization_type=distributions.NOT_REPARAMETERIZED,
             validate_args=False,
             allow_nan_stats=False,
-            name=name or self.__class__.__name__)
+            name=name or 'NoEventsDist')
         self._batch_shape_val = tf.TensorShape(batch_shape)
 
     def _batch_shape(self):
@@ -101,7 +101,7 @@ class NoLatents(base.DistCore):
     """DistCore that samples an empty latent state."""
 
     def __init__(self, hparams, name=None):
-        super(NoLatents, self).__init__(name or self.__class__.__name__)
+        super(NoLatents, self).__init__(name=name)
         self._hparams = hparams
 
     @property

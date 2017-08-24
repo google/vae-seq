@@ -76,7 +76,7 @@ class GenCore(snt.RNNCore):
     """An RNNCore that generates sequences of observed and latent variables."""
 
     def __init__(self, agent, latent_distcore, obs_distcore, name=None):
-        super(GenCore, self).__init__(name or self.__class__.__name__)
+        super(GenCore, self).__init__(name=name)
         assert isinstance(agent, agent_mod.Agent)
         assert isinstance(latent_distcore, DistCore)
         assert isinstance(obs_distcore, DistCore)
@@ -129,7 +129,7 @@ class VAEBase(snt.AbstractModule):
     """Base class for Sequential VAE implementations."""
 
     def __init__(self, agent, name=None):
-        super(VAEBase, self).__init__(name or self.__class__.__name__)
+        super(VAEBase, self).__init__(name=name)
         self._agent = agent
         self._latent_prior_distcore = None
         self._observed_distcore = None

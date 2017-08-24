@@ -10,7 +10,7 @@ class LatentDecoder(snt.AbstractModule):
     """Inputs -> P(latent | inputs)"""
 
     def __init__(self, hparams, name=None):
-        super(LatentDecoder, self).__init__(name or self.__class__.__name__)
+        super(LatentDecoder, self).__init__(name=name)
         self._hparams = hparams
 
     def _build(self, *inputs):
