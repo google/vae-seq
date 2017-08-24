@@ -27,10 +27,6 @@ class Agent(agent_mod.Agent):
                 self._inner_agent.context_size)
 
     @property
-    def context_dtype(self):
-        return (tf.float32, self._inner_agent.context_dtype)
-
-    @property
     def state_size(self):
         return (
             tf.TensorShape([]),  # selected action.

@@ -68,7 +68,6 @@ class SRNN(base.VAEBase):
 
         def _inf_step((d_out, e_out), prev_latent):
             """Iterate over d_1:T and e_1:T to produce z_1:T."""
-           
             p_z = self._latent_p.dist(d_out, prev_latent)
             q_loc, q_scale = self._latent_q(e_out, prev_latent)
             if hparams.srnn_use_res_q:

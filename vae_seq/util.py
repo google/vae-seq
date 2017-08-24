@@ -22,6 +22,16 @@ def reverse_dynamic_rnn(cell, inputs, time_major=False, **kwargs):
     return snt.nest.map(reverse_seq, output), state
 
 
+def rnn_aux_output_to_batch_major(tensor_array, inputs):
+    """Stacks a TensorArray, transposes to batch major, and sets shape info."""
+    ret = tensor_array.stack()
+    ret.set_shape([inputs.get_shape()[1], inputs.get_shape()[0]] +
+                  ret.get_shape()[2:].as_list())
+    perm = range(ret.get_shape().ndims)
+    perm[0], perm[1] = 1, 0
+    return tf.transpose(ret, perm=perm)
+
+
 def activation(hparams):
     """Returns the activation function selected in hparams."""
     return {

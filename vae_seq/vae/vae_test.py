@@ -40,11 +40,8 @@ def _gen_tensors(hparams, gen_core):
     agent_inputs = agent_mod.null_inputs(
         hparams.batch_size, hparams.sequence_size)
     initial_state = gen_core.initial_state(hparams.batch_size)
-    (generated, sampled_latents, _unused_agent_states), _ = tf.nn.dynamic_rnn(
-        gen_core,
-        agent_inputs,
-        initial_state=initial_state,
-        dtype=gen_core.output_dtype)
+    generated, sampled_latents, _unused_agent_states = gen_core.generate(
+        agent_inputs, initial_state=initial_state)
     return [generated, sampled_latents]
 
 

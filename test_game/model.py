@@ -45,11 +45,9 @@ def train_graph(hparams, vae):
 def gen_graph(hparams, vae):
     with tf.name_scope("generate"):
         agent_inputs = vae.agent.inputs()
-        (generated, latents, agent_states), _ = tf.nn.dynamic_rnn(
-            vae.gen_core,
+        generated, latents, agent_states = vae.gen_core.generate(
             agent_inputs,
-            initial_state=vae.gen_core.initial_state(hparams.batch_size),
-            dtype=vae.gen_core.output_dtype)
+            initial_state=vae.gen_core.initial_state(hparams.batch_size))
         env_inputs = tf.map_fn(
             lambda args: vae.agent.env_input(*args),
             (agent_inputs, agent_states),
