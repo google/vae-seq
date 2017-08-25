@@ -112,50 +112,28 @@ class GenCore(snt.RNNCore):
                 self._latent_distcore.event_dtype,
                 self._agent.state_dtype)
 
-    def _build(self, agent_input, state):
+    def _build(self, input_, state):
         agent_state, latent_state, obs_state = state
-        context = self._agent.context(agent_input, agent_state)
+        context = self._agent.context(input_, agent_state)
         latent, latent_state = self._latent_distcore.samples(
             context, latent_state)
         obs, obs_state = self._obs_distcore.samples(
             (context, latent), obs_state)
         output = (obs, latent, agent_state)
-        agent_state = self._agent.observe(agent_input, obs, agent_state)
+        agent_state = self._agent.observe(input_, obs, agent_state)
         state = (agent_state, latent_state, obs_state)
         return output, state
 
-    def generate(self, agent_inputs, initial_state):
+    def generate(self, agent_inputs, initial_state=None):
         """Generates sequences of observations, latents, and agent states."""
-        # This would be a more straightforward call to
-        # tf.nn.dynamic_rnn if it supported heterogeneous output
-        # dtypes.
-        length = tf.shape(agent_inputs)[1]
-        aux_output_tas = snt.nest.map(
-            lambda dtype: tf.TensorArray(dtype, size=length),
-            (self._latent_distcore.event_dtype, self._agent.state_dtype))
-        initial_aux_state = (0, aux_output_tas, initial_state)
-
-        def _step(agent_input, aux_state):
-            (step, aux_output_tas, state) = aux_state
-            (obs, latent, agent_state), state = self(agent_input, state)
-            aux_output_tas = snt.nest.map(
-                lambda ta, val: ta.write(step, val),
-                aux_output_tas, (latent, agent_state))
-            aux_state = (step + 1, aux_output_tas, state)
-            return obs, aux_state
-
-        generated, aux_state = tf.nn.dynamic_rnn(
-            util.WrapRNNCore(
-                _step,
-                state_size=(None, None, self.state_size),
-                output_size=self.output_size[0]),
+        if initial_state is None:
+            batch_size = tf.shape(agent_inputs)[0]
+            initial_state = self.initial_state(batch_size)
+        return util.heterogeneous_dynamic_rnn(
+            self,
             agent_inputs,
-            initial_state=initial_aux_state,
-            dtype=self._obs_distcore.event_dtype)
-        latents, agent_states = snt.nest.map(
-            lambda ta: util.rnn_aux_output_to_batch_major(ta, agent_inputs),
-            aux_state[1])
-        return generated, latents, agent_states
+            initial_state=initial_state,
+            output_dtypes=self.output_dtype)[0]
 
 
 class VAEBase(snt.AbstractModule):

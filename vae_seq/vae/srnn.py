@@ -68,6 +68,7 @@ class SRNN(base.VAEBase):
 
         def _inf_step((d_out, e_out), prev_latent):
             """Iterate over d_1:T and e_1:T to produce z_1:T."""
+           
             p_z = self._latent_p.dist(d_out, prev_latent)
             q_loc, q_scale = self._latent_q(e_out, prev_latent)
             if hparams.srnn_use_res_q:
@@ -83,10 +84,11 @@ class SRNN(base.VAEBase):
             output_size=(tf.TensorShape(hparams.latent_size),  # latent
                          tf.TensorShape([]),),                 # divergence
             name="inf_z_core")
-        (latents, kls), _ = tf.nn.dynamic_rnn(
+        (latents, kls), _ = util.heterogeneous_dynamic_rnn(
             inf_core,
             (d_outs, e_outs),
-            initial_state=z_initial)
+            initial_state=z_initial,
+            output_dtypes=(self._latent_q.event_dtype, tf.float32))
         return latents, kls
 
 

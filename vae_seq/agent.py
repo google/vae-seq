@@ -17,6 +17,11 @@ class Agent(snt.AbstractModule):
 
     @property
     @abc.abstractmethod
+    def context_dtype(self):
+        return
+
+    @property
+    @abc.abstractmethod
     def state_size(self):
         return
 
@@ -59,6 +64,10 @@ class EncodeObsAgent(Agent):
         return self._obs_encoder.output_size
 
     @property
+    def context_dtype(self):
+        return tf.float32
+
+    @property
     def state_size(self):
         return self.context_size
 
@@ -96,39 +105,29 @@ def contexts_for_static_observations(observations, agent, agent_inputs):
         util.WrapRNNCore(_step, agent.state_size, agent.context_size),
         (agent_inputs, observations),
         initial_state=initial_state,
-        dtype=tf.float32)
+        dtype=agent.context_dtype)
     return contexts
 
 
 def contexts_and_observations_from_environment(env, agent, agent_inputs):
     """Generate contexts and observations from an environment RNNCore."""
     batch_size = tf.shape(agent_inputs)[0]
+    initial_state = (agent.initial_state(batch_size),
+                     env.initial_state(batch_size))
 
-    # tf.nn.dynamic_rnn doesn't support heterogeneous output types, so we
-    # only output the contexts. The observations are written into a TensorArray
-    # in the state.
-    obs_ta = tf.TensorArray(env.output_dtype, size=tf.shape(agent_inputs)[1])
-    initial_state = (0,  # step
-                     obs_ta,
-                     agent.initial_state(batch_size),
-                     env.initial_state(batch_size),)
-
-    def _step(agent_input, (step, obs_ta, agent_state, env_state)):
+    def _step(agent_input, (agent_state, env_state)):
         context = agent.context(agent_input, agent_state)
         env_input = agent.env_input(agent_input, agent_state)
         obs, env_state = env(env_input, env_state)
         agent_state = agent.observe(agent_input, obs, agent_state)
-        obs_ta = obs_ta.write(step, obs)
-        return context, (step + 1, obs_ta, agent_state, env_state)
+        return (context, obs), (agent_state, env_state)
 
-    contexts, state = tf.nn.dynamic_rnn(
+    (contexts, observations), _ = util.heterogeneous_dynamic_rnn(
         util.WrapRNNCore(
             _step,
-            state_size=(None, None, agent.state_size, env.state_size),
-            output_size=agent.context_size),
+            state_size=(agent.state_size, env.state_size),
+            output_size=(agent.context_size, env.output_size)),
         agent_inputs,
         initial_state=initial_state,
-        dtype=tf.float32)
-    observations = util.rnn_aux_output_to_batch_major(
-        state[1], agent_inputs)
+        output_dtypes=(agent.context_dtype, env.output_dtype))
     return contexts, observations

@@ -39,9 +39,7 @@ def _gen_tensors(hparams, gen_core):
     """Samples observations and latent variables from the VAE."""
     agent_inputs = agent_mod.null_inputs(
         hparams.batch_size, hparams.sequence_size)
-    initial_state = gen_core.initial_state(hparams.batch_size)
-    generated, sampled_latents, _unused_agent_states = gen_core.generate(
-        agent_inputs, initial_state=initial_state)
+    generated, sampled_latents, _ = gen_core.generate(agent_inputs)
     return [generated, sampled_latents]
 
 
