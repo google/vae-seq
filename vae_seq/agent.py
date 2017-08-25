@@ -13,26 +13,26 @@ class Agent(snt.AbstractModule):
     @property
     @abc.abstractmethod
     def context_size(self):
-        return
+        """The non-batch sizes of Tensors returned by self.context."""
 
     @property
     @abc.abstractmethod
     def context_dtype(self):
-        return
+        """The types of Tensors returned by self.context."""
 
     @property
     @abc.abstractmethod
     def state_size(self):
-        return
+        """The non-batch sizes of this Agent's state Tensors."""
 
     @property
     @abc.abstractmethod
     def state_dtype(self):
-        return
+        """The types of Tensors in this Agent's state."""
 
     @abc.abstractmethod
     def initial_state(self, batch_size):
-        return
+        """Returns an initial state tuple."""
 
     @abc.abstractmethod
     def observe(self, agent_input, observation, state):
@@ -97,6 +97,7 @@ def contexts_for_static_observations(observations, agent, agent_inputs):
     initial_state = agent.initial_state(batch_size)
 
     def _step((agent_input, obs), state):
+        """Record the agent's context for the given observation."""
         context = agent.context(agent_input, state)
         state = agent.observe(agent_input, obs, state)
         return context, state
@@ -116,6 +117,7 @@ def contexts_and_observations_from_environment(env, agent, agent_inputs):
                      env.initial_state(batch_size))
 
     def _step(agent_input, (agent_state, env_state)):
+        """Have the agent manipulate the environment and record what happens."""
         context = agent.context(agent_input, agent_state)
         env_input = agent.env_input(agent_input, agent_state)
         obs, env_state = env(env_input, env_state)

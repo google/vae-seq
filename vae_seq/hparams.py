@@ -1,3 +1,5 @@
+"""Hyperparameters used in this library."""
+
 import tensorflow as tf
 
 _DEFAULTS = dict(
@@ -37,6 +39,7 @@ _DEFAULTS = dict(
 
 
 def HParams(**kwargs):
+    """Initialize HParams with the defaults in this module."""
     init = dict(_DEFAULTS)
     init.update(kwargs)
     return tf.contrib.training.HParams(**init)

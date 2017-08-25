@@ -35,7 +35,7 @@ class IndependentSequence(base.VAEBase):
         self._hparams = hparams
         self._obs_encoder = obs_encoder
         self._obs_decoder = obs_decoder
-        super(IndependentSequence, self).__init__(agent, name)
+        super(IndependentSequence, self).__init__(agent, name=name)
 
     def _init_submodules(self):
         hparams = self._hparams
