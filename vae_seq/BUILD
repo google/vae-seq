@@ -1,9 +1,13 @@
 # Everything depends on TensorFlow and Sonnet.
 package(default_visibility = ["//visibility:public"])
 
-py_library(
-    name = "feedback_rnn_core",
-    srcs = ["feedback_rnn_core.py"],
+test_suite(
+    name = "tests",
+    tests = [
+          "agent_test",
+          "util_test",
+          "//vae_seq/vae:vae_test",
+    ],
 )
 
 py_library(
@@ -14,6 +18,15 @@ py_library(
 py_library(
     name = "util",
     srcs = ["util.py"],
+)
+
+py_test(
+    name = "util_test",
+    srcs = ["util_test.py"],
+    deps = [
+         ":hparams",
+         ":util",
+    ],
 )
 
 py_library(
@@ -29,6 +42,8 @@ py_test(
     srcs = ["agent_test.py"],
     deps = [
         ":agent",
+        ":obs_layers",
+        ":hparams",
     ],
 )
 

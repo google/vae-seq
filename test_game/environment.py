@@ -1,12 +1,15 @@
+"""Environment that runs the test game."""
+
 import pickle
 import numpy as np
 import tensorflow as tf
-import sonnet as snt
+from vae_seq import agent as agent_mod
 
 from . import game as game_mod
 
 
-class Environment(snt.RNNCore):
+class Environment(agent_mod.Environment):
+    """Plays a batch of games, keeping pickled game states as RNN state."""
 
     def __init__(self, hparams, name=None):
         super(Environment, self).__init__(name=name)
@@ -28,6 +31,7 @@ class Environment(snt.RNNCore):
         hparams = self._hparams
 
         def _random_games(batch_size):
+            """Produces a serialized batch of randomized games."""
             return np.array(
                 [
                     pickle.dumps(
@@ -44,6 +48,7 @@ class Environment(snt.RNNCore):
     def _build(self, actions, state):
 
         def _step(actions, state):
+            """Applies the batch actions to the batch of serialized games."""
             games = [pickle.loads(game) for game in state]
             for action, game in zip(actions, games):
                 game.take_action(action)

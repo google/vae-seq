@@ -3,18 +3,15 @@
 import tensorflow as tf
 
 _DEFAULTS = dict(
-    # Shape of observed events, set in game-specific code.
+    # Shape of observed events, set in environment-specific code.
     obs_shape=None,
-
-    # Size of encoded (flat) observations
-    enc_obs_size=128,
 
     # Number of latent units per time step
     latent_size=4,
 
     # Model parameters
-    obs_encoder_fc_layers=[256],
-    obs_decoder_fc_layers=[256],
+    obs_encoder_fc_layers=[256, 128],
+    obs_decoder_fc_hidden_layers=[256],
     latent_decoder_fc_layers=[256],
     rnn_hidden_sizes=[32],
 

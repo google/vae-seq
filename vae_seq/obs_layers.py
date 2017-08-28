@@ -8,38 +8,53 @@ from tensorflow.contrib import distributions
 from . import util
 
 
-class ObsEncoder(snt.AbstractModule):
-    """Observed -> encoded, flat observation."""
+class IdentityObsEncoder(snt.AbstractModule):
+    """Forwards the (flattened) input observation."""
 
     def __init__(self, hparams, name=None):
-        super(ObsEncoder, self).__init__(name=name)
+        super(IdentityObsEncoder, self).__init__(name=name)
         self._hparams = hparams
 
     @property
     def output_size(self):
-        """Returns the output tensor shapes."""
-        return tf.TensorShape([self._hparams.enc_obs_size])
+        """Returns the output Tensor shapes."""
+        return tf.TensorShape([np.product(self._hparams.obs_shape)])
 
     def _build(self, obs):
-        hparams = self._hparams
-        mlp = util.make_mlp(
-            hparams,
-            hparams.obs_encoder_fc_layers + [self.output_size.num_elements()])
-        return mlp(snt.BatchFlatten()(tf.to_float(obs)))
+        return snt.BatchFlatten()(tf.to_float(obs))
 
 
-class ObsDecoder(snt.AbstractModule):
-    """inputs -> P(observed | inputs)"""
+class MLPObsEncoder(snt.AbstractModule):
+    """Observation -> encoded, flat observation."""
 
     def __init__(self, hparams, name=None):
-        super(ObsDecoder, self).__init__(name=name)
+        super(MLPObsEncoder, self).__init__(name=name)
+        with self._enter_variable_scope():
+            self._mlp = util.make_mlp(
+                hparams,
+                hparams.obs_encoder_fc_layers)
+
+    @property
+    def output_size(self):
+        """Returns the output Tensor shapes."""
+        return self._mlp.output_size
+
+    def _build(self, obs):
+        return self._mlp(snt.BatchFlatten()(tf.to_float(obs)))
+
+
+class OneHotObsDecoder(snt.AbstractModule):
+    """inputs -> Categorical(observed; logits=mlp(inputs))"""
+
+    def __init__(self, hparams, name=None):
+        super(OneHotObsDecoder, self).__init__(name=name)
         self._hparams = hparams
 
     def _build(self, *inputs):
         hparams = self._hparams
-        mlp = util.make_mlp(
-            hparams,
-            hparams.obs_decoder_fc_layers + [np.product(hparams.obs_shape)])
+        layers = (hparams.obs_decoder_fc_hidden_layers +
+                  [np.product(hparams.obs_shape)])
+        mlp = util.make_mlp(hparams, layers)
         logits = tf.reshape(
             mlp(util.concat_features(inputs)),
             [-1] + hparams.obs_shape)

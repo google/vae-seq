@@ -5,11 +5,11 @@ import tensorflow as tf
 from tensorflow.contrib import distributions
 
 
-def calc_kl(hparams, q_sample, dist_q, dist_p):
-    """Calculates a KL divergence, either analytically or via MC estimate."""
+def calc_kl(hparams, a_sample, dist_a, dist_b):
+    """Calculates KL(a||b), either analytically or via MC estimate."""
     if hparams.use_monte_carlo_kl:
-        return dist_q.log_prob(q_sample) - dist_p.log_prob(q_sample)
-    return distributions.kl_divergence(dist_q, dist_p)
+        return dist_a.log_prob(a_sample) - dist_b.log_prob(a_sample)
+    return distributions.kl_divergence(dist_a, dist_b)
 
 
 def activation(hparams):

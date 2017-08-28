@@ -1,3 +1,5 @@
+"""An agent implementation for the test game environment."""
+
 import numpy as np
 import tensorflow as tf
 from vae_seq import agent as agent_mod

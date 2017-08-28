@@ -1,3 +1,5 @@
+"""Functions to build up training and generation graphs."""
+
 import tensorflow as tf
 
 from vae_seq import hparams as hparams_mod
@@ -26,14 +28,16 @@ def display(actions, latents, observed):
 
 
 def make_vae(hparams):
+    """Constructs a VAE for modelling test games."""
     with tf.name_scope("vae"):
-        obs_decoder = obs_layers.ObsDecoder(hparams)
-        obs_encoder = obs_layers.ObsEncoder(hparams)
+        obs_encoder = obs_layers.MLPObsEncoder(hparams)
+        obs_decoder = obs_layers.OneHotObsDecoder(hparams)
         agent = agent_mod.Agent(hparams, obs_encoder)
         return vae_mod.make(hparams, agent, obs_encoder, obs_decoder)
 
 
 def train_graph(hparams, vae):
+    """Constructs a training graph."""
     with tf.name_scope("training_data"):
         contexts, observations = vae.agent.contexts_and_observations(
             env_mod.Environment(hparams))
@@ -43,6 +47,8 @@ def train_graph(hparams, vae):
 
 
 def gen_graph(hparams, vae):
+    """Constructs a generation graph."""
+    del hparams  # not used, only passed in for consistency.
     with tf.name_scope("generate"):
         agent_inputs = vae.agent.inputs()
         generated, latents, agent_states = vae.gen_core.generate(agent_inputs)
@@ -54,6 +60,7 @@ def gen_graph(hparams, vae):
 
 
 def train(hparams, log_dir, num_steps):
+    """Trains/continues training a VAE and saves it in log_dir."""
     vae = make_vae(hparams)
     train_op, debug_tensors = train_graph(hparams, vae)
     env_inputs, latents, generated = gen_graph(hparams, vae)
@@ -76,6 +83,7 @@ def train(hparams, log_dir, num_steps):
 
 
 def play(hparams, log_dir):
+    """Loads a trained VAE and plays interactively against it."""
     hparams.batch_size = 1
     vae = make_vae(hparams)
     vae.agent.interactive = True
@@ -87,6 +95,7 @@ def play(hparams, log_dir):
 
 
 def hparams(hparams_flag=""):
+    """Produces HParams with flag overrides."""
     ret = hparams_mod.HParams(test_game_width=3, test_game_classes=4)
     ret.parse(hparams_flag)
     ret.obs_shape = [ret.test_game_classes]

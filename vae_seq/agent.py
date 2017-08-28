@@ -10,23 +10,19 @@ from . import util
 class Agent(snt.AbstractModule):
     """Base class for agents."""
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def context_size(self):
         """The non-batch sizes of Tensors returned by self.context."""
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def context_dtype(self):
         """The types of Tensors returned by self.context."""
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def state_size(self):
         """The non-batch sizes of this Agent's state Tensors."""
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def state_dtype(self):
         """The types of Tensors in this Agent's state."""
 
@@ -49,6 +45,14 @@ class Agent(snt.AbstractModule):
         """Optional method to generate training data from an environment."""
         # Default to providing the context.
         return self.context(agent_input, state)
+
+
+class Environment(snt.RNNCore):
+    """An Environment is an RNN that takes contexts and returns observations."""
+
+    @abc.abstractproperty
+    def output_dtype(self):
+        """The types of observation Tensors."""
 
 
 class EncodeObsAgent(Agent):

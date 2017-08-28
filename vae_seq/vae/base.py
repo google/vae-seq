@@ -10,18 +10,15 @@ from .. import util
 class DistCore(snt.AbstractModule):
     """Like an RNNCore, but outputs distributions."""
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def state_size(self):
         """Returns the non-batched sizes of Tensors returned from next_state."""
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def event_size(self):
         """Returns the output distribution event sizes."""
 
-    @property
-    @abc.abstractmethod
+    @abc.abstractproperty
     def event_dtype(self):
         """Returns the output distribution event dtypes."""
 

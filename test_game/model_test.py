@@ -1,9 +1,12 @@
+"""Tests for training and generating graphs."""
+
 import tensorflow as tf
 
 from test_game import model
 
 
 def _hparams(vae_type):
+    """HParams used for testing the given VAE type."""
     hparams = model.hparams()
     hparams.vae_type = vae_type
     hparams.check_numerics = True
@@ -13,6 +16,7 @@ def _hparams(vae_type):
 class ModelTest(tf.test.TestCase):
 
     def _test_training(self, vae_type):
+        """Test the training graph for the given VAE type."""
         hparams = _hparams(vae_type)
         vae = model.make_vae(hparams)
         train_op, debug_tensors = model.train_graph(hparams, vae)
@@ -25,6 +29,7 @@ class ModelTest(tf.test.TestCase):
             self.assertGreater(elbo_2, elbo_1)
 
     def _test_generating(self, vae_type):
+        """Test the generation graph for the given VAE type."""
         hparams = _hparams(vae_type)
         vae = model.make_vae(hparams)
         env_inputs, latents, generated = model.gen_graph(hparams, vae)

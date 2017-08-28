@@ -1,10 +1,14 @@
-import sonnet as snt
+"""Tests for Agent functionality."""
+
 import tensorflow as tf
 
 from vae_seq import agent as agent_mod
+from vae_seq import hparams as hparams_mod
+from vae_seq import obs_layers
 
 
-class TestEnvironment(snt.RNNCore):
+class TestEnvironment(agent_mod.Environment):
+    """An environment that returns observations as context + state."""
 
     @property
     def output_size(self):
@@ -24,15 +28,10 @@ class TestEnvironment(snt.RNNCore):
     def _build(self, context, state):
         return context + tf.expand_dims(state, 1), state
 
-
-class IdentityObsEncoder(snt.AbstractModule):
-
-    @property
-    def output_size(self):
-        return tf.TensorShape([1])
-
-    def _build(self, x):
-        return x
+def _make_agent():
+    """Returns an agent that passes through the last observation as context."""
+    hparams = hparams_mod.HParams(obs_shape=[1])
+    return agent_mod.EncodeObsAgent(obs_layers.IdentityObsEncoder(hparams))
 
 
 class AgentTest(tf.test.TestCase):
@@ -43,7 +42,7 @@ class AgentTest(tf.test.TestCase):
                 sess.run(tf.shape(agent_mod.null_inputs(3, 5))), [3, 5, 0])
 
     def test_contexts_for_static_obs(self):
-        agent = agent_mod.EncodeObsAgent(IdentityObsEncoder(name="identity"))
+        agent = _make_agent()
         obs = tf.constant([[[1.], [2.], [3.]],
                            [[4.], [5.], [6.]]])
         ctx = agent_mod.contexts_for_static_observations(
@@ -56,7 +55,7 @@ class AgentTest(tf.test.TestCase):
 
     def test_contexts_from_env(self):
         env = TestEnvironment(name="test_env")
-        agent = agent_mod.EncodeObsAgent(IdentityObsEncoder(name="identity"))
+        agent = _make_agent()
         ctx, obs = agent_mod.contexts_and_observations_from_environment(
             env, agent, agent_mod.null_inputs(2, 3))
         ctx2 = agent_mod.contexts_for_static_observations(

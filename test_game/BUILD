@@ -1,3 +1,10 @@
+test_suite(
+    name = "tests",
+    tests = [
+        "model_test",
+    ],
+)
+
 py_library(
     name = "game",
     srcs = ["game.py"],

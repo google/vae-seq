@@ -10,8 +10,8 @@ from vae_seq import vae as vae_mod
 
 def _build_vae(hparams):
     """Constructs a VAE."""
-    obs_encoder = obs_layers.ObsEncoder(hparams)
-    obs_decoder = obs_layers.ObsDecoder(hparams)
+    obs_encoder = obs_layers.MLPObsEncoder(hparams)
+    obs_decoder = obs_layers.OneHotObsDecoder(hparams)
     agent = agent_mod.EncodeObsAgent(obs_encoder)
     return vae_mod.make(hparams, agent, obs_encoder, obs_decoder)
 
@@ -86,7 +86,6 @@ def _all_tensors(hparams, vae):
 
 
 class VAETest(tf.test.TestCase):
-    """Tests for VAEBase implementations."""
 
     def _test_vae(self, vae_type):
         """Make sure that all tensors and assertions evaluate without error."""
