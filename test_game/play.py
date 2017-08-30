@@ -1,6 +1,7 @@
 """Play the test game using a trained model."""
 
 import tensorflow as tf
+from test_game import hparams as hparams_mod
 from test_game import model
 
 flags = tf.app.flags
@@ -14,7 +15,7 @@ def main(argv):
     del argv
     assert FLAGS.log_dir, "Please supply a --log_dir."
     tf.logging.set_verbosity(tf.logging.INFO)
-    hparams = model.hparams(FLAGS.hparams)
+    hparams = hparams_mod.make_hparams(FLAGS.hparams)
     model.play(hparams, FLAGS.log_dir)
 
 

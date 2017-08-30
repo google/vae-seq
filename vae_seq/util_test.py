@@ -28,7 +28,7 @@ def _identity_core(input_shape):
 class UtilTest(tf.test.TestCase):
 
     def test_calc_kl_analytical(self):
-        hparams = hparams_mod.HParams(use_monte_carlo_kl=False)
+        hparams = hparams_mod.make_hparams(use_monte_carlo_kl=False)
         dist_a = tf.distributions.Bernoulli(probs=0.5)
         dist_b = tf.distributions.Bernoulli(probs=0.3)
         kl_div = util.calc_kl(hparams, dist_a.sample(), dist_a, dist_b)
@@ -39,7 +39,7 @@ class UtilTest(tf.test.TestCase):
 
     def test_calc_kl_mc(self):
         tf.set_random_seed(0)
-        hparams = hparams_mod.HParams(use_monte_carlo_kl=True)
+        hparams = hparams_mod.make_hparams(use_monte_carlo_kl=True)
         samples = 1000
         dist_a = tf.distributions.Bernoulli(probs=tf.fill([samples], 0.5))
         dist_b = tf.distributions.Bernoulli(probs=tf.fill([samples], 0.3))

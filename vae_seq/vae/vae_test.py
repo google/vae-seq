@@ -89,7 +89,7 @@ class VAETest(tf.test.TestCase):
 
     def _test_vae(self, vae_type):
         """Make sure that all tensors and assertions evaluate without error."""
-        hparams = hparams_mod.HParams(obs_shape=[2], vae_type=vae_type)
+        hparams = hparams_mod.make_hparams(obs_shape=[2], vae_type=vae_type)
         vae = _build_vae(hparams)
         inf_tensors, gen_tensors, assertions = _all_tensors(hparams, vae)
         with self.test_session() as sess:

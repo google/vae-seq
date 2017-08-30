@@ -34,9 +34,11 @@ _DEFAULTS = dict(
     check_numerics=False,
 )
 
-
-def HParams(**kwargs):
+def make_hparams(flag_value=None, **kwargs):
     """Initialize HParams with the defaults in this module."""
     init = dict(_DEFAULTS)
     init.update(kwargs)
-    return tf.contrib.training.HParams(**init)
+    ret = tf.contrib.training.HParams(**init)
+    if flag_value:
+        ret.parse(flag_value)
+    return ret

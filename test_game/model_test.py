@@ -2,12 +2,13 @@
 
 import tensorflow as tf
 
+from test_game import hparams as hparams_mod
 from test_game import model
 
 
 def _hparams(vae_type):
     """HParams used for testing the given VAE type."""
-    hparams = model.hparams()
+    hparams = hparams_mod.make_hparams()
     hparams.vae_type = vae_type
     hparams.check_numerics = True
     return hparams

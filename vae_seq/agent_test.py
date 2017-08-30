@@ -28,9 +28,10 @@ class TestEnvironment(agent_mod.Environment):
     def _build(self, context, state):
         return context + tf.expand_dims(state, 1), state
 
+
 def _make_agent():
     """Returns an agent that passes through the last observation as context."""
-    hparams = hparams_mod.HParams(obs_shape=[1])
+    hparams = hparams_mod.make_hparams(obs_shape=[1])
     return agent_mod.EncodeObsAgent(obs_layers.IdentityObsEncoder(hparams))
 
 

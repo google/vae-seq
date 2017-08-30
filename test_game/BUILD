@@ -31,6 +31,13 @@ py_library(
 )
 
 py_library(
+    name = "hparams",
+    srcs = ["hparams.py"],
+    deps = [
+        "//vae_seq:hparams",
+    ])
+
+py_library(
     name = "model",
     srcs = ["model.py"],
     deps = [
@@ -38,7 +45,6 @@ py_library(
         ":environment",
         ":game",
         "//vae_seq/vae",
-        "//vae_seq:hparams",
         "//vae_seq:obs_layers",
         "//vae_seq:train",
     ],
@@ -48,6 +54,7 @@ py_test(
     name = "model_test",
     srcs = ["model_test.py"],
     deps = [
+        ":hparams",
         ":model",
     ],
 )
@@ -56,6 +63,7 @@ py_binary(
     name = "train",
     srcs = ["train.py"],
     deps = [
+        ":hparams",
         ":model",
     ],
 )
@@ -64,6 +72,7 @@ py_binary(
     name = "play",
     srcs = ["play.py"],
     deps = [
+        ":hparams",
         ":model",
     ],
 )

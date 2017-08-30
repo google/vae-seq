@@ -92,11 +92,3 @@ def play(hparams, log_dir):
         session_creator=tf.train.ChiefSessionCreator(
             checkpoint_dir=log_dir)) as sess:
         sess.run(generated)
-
-
-def hparams(hparams_flag=""):
-    """Produces HParams with flag overrides."""
-    ret = hparams_mod.HParams(test_game_width=3, test_game_classes=4)
-    ret.parse(hparams_flag)
-    ret.obs_shape = [ret.test_game_classes]
-    return ret
