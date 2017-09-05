@@ -54,8 +54,9 @@ class SRNN(base.VAEBase):
 
     def infer_latents(self, contexts, observed):
         hparams = self._hparams
+        batch_size = util.batch_size(hparams)
         z_initial, d_initial = self.latent_prior_distcore.samples.initial_state(
-            hparams.batch_size)
+            batch_size)
         d_outs, _ = tf.nn.dynamic_rnn(
             self._d_core,
             util.concat_features(contexts),
@@ -64,7 +65,7 @@ class SRNN(base.VAEBase):
         e_outs, _ = util.reverse_dynamic_rnn(
             self._e_core,
             util.concat_features((enc_observed, contexts)),
-            initial_state=self._e_core.initial_state(hparams.batch_size))
+            initial_state=self._e_core.initial_state(batch_size))
 
         def _inf_step((d_out, e_out), prev_latent):
             """Iterate over d_1:T and e_1:T to produce z_1:T."""

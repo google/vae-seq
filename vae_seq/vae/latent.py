@@ -31,7 +31,7 @@ class LatentDecoder(snt.AbstractModule):
 
     def dist(self, *inputs):
         """Returns p(latent | inputs)."""
-        return self.output_dist(self(*inputs), name=self.module_name + "Dist")
+        return self.output_dist(self(*inputs), name=self.module_name + "_dist")
 
     @property
     def event_dtype(self):

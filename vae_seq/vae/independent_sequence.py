@@ -49,15 +49,16 @@ class IndependentSequence(base.VAEBase):
 
     def infer_latents(self, contexts, observed):
         hparams = self._hparams
+        batch_size = util.batch_size(hparams)
         enc_observed = snt.BatchApply(self._obs_encoder, n_dims=2)(observed)
         e_outs, _ = tf.nn.dynamic_rnn(
             self._e_core,
             util.concat_features((contexts, enc_observed)),
-            initial_state=self._e_core.initial_state(hparams.batch_size))
+            initial_state=self._e_core.initial_state(batch_size))
         f_outs, _ = util.reverse_dynamic_rnn(
             self._f_core,
             e_outs,
-            initial_state=self._f_core.initial_state(hparams.batch_size))
+            initial_state=self._f_core.initial_state(batch_size))
         q_zs = self._q_z.output_dist(
             snt.BatchApply(self._q_z, n_dims=2)(f_outs),
             name="q_zs")
@@ -106,11 +107,13 @@ class LatentPrior(base.DistCore):
         super(LatentPrior, self).__init__(name=name)
         self._hparams = hparams
         with self._enter_variable_scope():
-            dims = [hparams.batch_size, hparams.latent_size]
+            dims = tf.stack([util.batch_size(hparams), hparams.latent_size])
+            loc = tf.zeros(dims)
+            loc.set_shape([None, hparams.latent_size])
+            scale_diag = tf.ones(dims)
+            scale_diag.set_shape([None, hparams.latent_size])
             self._dist = distributions.MultivariateNormalDiag(
-                loc=tf.zeros(dims),
-                scale_diag=tf.ones(dims),
-                name="prior_z")
+                loc=loc, scale_diag=scale_diag, name="prior_z")
 
     @property
     def state_size(self):

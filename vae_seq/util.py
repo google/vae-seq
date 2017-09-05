@@ -141,3 +141,35 @@ def reverse_dynamic_rnn(cell, inputs, time_major=False, **kwargs):
     output, state = tf.nn.dynamic_rnn(
         cell, inputs, time_major=time_major, **kwargs)
     return snt.nest.map(reverse_seq, output), state
+
+
+def dynamic_hparam(key, value, collection_name="HPARAMS"):
+    """Returns a memoized, non-constant Tensor that allows feeding."""
+    collection = tf.get_collection_ref(collection_name)
+    for tensor in collection:
+        if tensor.name == key:
+            return tensor
+    with tf.name_scope(""):
+        default_value = tf.convert_to_tensor(value, name=key + "_default")
+        tensor = tf.placeholder_with_default(
+            default_value,
+            default_value.get_shape(),
+            name=key)
+        collection.append(tensor)
+        return tensor
+
+
+def batch_size(hparams, collection_name="HPARAMS"):
+    """Returns a non-constant Tensor that evaluates to hparams.batch_size."""
+    return dynamic_hparam(
+        "batch_size",
+        hparams.batch_size,
+        collection_name=collection_name)
+
+
+def sequence_size(hparams, collection_name="HPARAMS"):
+    """Returns a non-constant Tensor that evaluates to hparams.sequence_size."""
+    return dynamic_hparam(
+        "sequence_size",
+        hparams.sequence_size,
+        collection_name=collection_name)

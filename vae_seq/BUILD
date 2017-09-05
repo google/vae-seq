@@ -58,5 +58,7 @@ py_library(
 py_library(
     name = "train",
     srcs = ["train.py"],
-    deps = [],
+    deps = [
+        ":util",
+    ],
 )

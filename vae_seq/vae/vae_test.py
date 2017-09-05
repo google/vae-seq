@@ -5,6 +5,7 @@ import tensorflow as tf
 from vae_seq import agent as agent_mod
 from vae_seq import hparams as hparams_mod
 from vae_seq import obs_layers
+from vae_seq import util
 from vae_seq import vae as vae_mod
 
 
@@ -18,7 +19,7 @@ def _build_vae(hparams):
 
 def _observed(hparams):
     """Test observations."""
-    return tf.zeros([hparams.batch_size, hparams.sequence_size] +
+    return tf.zeros([util.batch_size(hparams), util.sequence_size(hparams)] +
                     hparams.obs_shape, dtype=tf.int32)
 
 
@@ -26,7 +27,7 @@ def _inf_tensors(hparams, vae):
     """Simple inference graph."""
     observed = _observed(hparams)
     agent_inputs = agent_mod.null_inputs(
-        hparams.batch_size, hparams.sequence_size)
+        util.batch_size(hparams), util.sequence_size(hparams))
     contexts = agent_mod.contexts_for_static_observations(
         observed, vae.agent, agent_inputs)
     latents, divs = vae.infer_latents(contexts, observed)
@@ -38,7 +39,7 @@ def _inf_tensors(hparams, vae):
 def _gen_tensors(hparams, gen_core):
     """Samples observations and latent variables from the VAE."""
     agent_inputs = agent_mod.null_inputs(
-        hparams.batch_size, hparams.sequence_size)
+        util.batch_size(hparams), util.sequence_size(hparams))
     generated, sampled_latents, _ = gen_core.generate(agent_inputs)
     return [generated, sampled_latents]
 

@@ -27,6 +27,7 @@ py_library(
     deps = [
         ":game",
         "//vae_seq:agent",
+        "//vae_seq:util",
     ],
 )
 
@@ -35,7 +36,8 @@ py_library(
     srcs = ["hparams.py"],
     deps = [
         "//vae_seq:hparams",
-    ])
+    ]
+)
 
 py_library(
     name = "model",

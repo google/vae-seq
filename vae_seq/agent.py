@@ -73,7 +73,8 @@ class EncodeObsAgent(Agent):
 
     @property
     def state_size(self):
-        return self.context_size
+        # See context_size.
+        return self._obs_encoder.output_size
 
     @property
     def state_dtype(self):
@@ -106,11 +107,11 @@ def contexts_for_static_observations(observations, agent, agent_inputs):
         state = agent.observe(agent_input, obs, state)
         return context, state
 
-    contexts, _ = tf.nn.dynamic_rnn(
+    contexts, _ = util.heterogeneous_dynamic_rnn(
         util.WrapRNNCore(_step, agent.state_size, agent.context_size),
         (agent_inputs, observations),
         initial_state=initial_state,
-        dtype=agent.context_dtype)
+        output_dtypes=agent.context_dtype)
     return contexts
 
 

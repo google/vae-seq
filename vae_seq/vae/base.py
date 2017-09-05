@@ -29,13 +29,15 @@ class DistCore(snt.AbstractModule):
             """Samples from the distribution at each time step."""
             dist, state_arg = self(input_, state)
             event = dist.sample()
+            event.set_shape(
+                tf.TensorShape([None]).concatenate(dist.event_shape))
             state = self._next_state(state_arg, event)
             return event, state
         return util.WrapRNNCore(
             _step,
             self.state_size,
             output_size=self.event_size,
-            name=self.module_name + "/Samples")
+            name=self.module_name + "/samples")
 
     @property
     def log_probs(self):
@@ -49,7 +51,7 @@ class DistCore(snt.AbstractModule):
             _step,
             self.state_size,
             output_size=tf.TensorShape([]),
-            name=self.module_name + "/LogProbs")
+            name=self.module_name + "/log_probs")
 
     @abc.abstractmethod
     def _build_dist(self, input_, state):

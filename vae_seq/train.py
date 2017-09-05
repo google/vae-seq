@@ -3,6 +3,8 @@
 import sonnet as snt
 import tensorflow as tf
 
+from . import util
+
 
 class TrainOps(snt.AbstractModule):
     """This module produces a train_op given Agent contexts and observations."""
@@ -18,9 +20,10 @@ class TrainOps(snt.AbstractModule):
         log_probs = self._vae.log_prob_observed(contexts, latents, observed)
 
         # Compute the ELBO.
-        log_prob = tf.reduce_sum(log_probs) / hparams.batch_size
+        batch_size = tf.to_float(util.batch_size(hparams))
+        log_prob = tf.reduce_sum(log_probs) / batch_size
         tf.summary.scalar("log_prob", log_prob)
-        divergence = tf.reduce_sum(divs) / hparams.batch_size
+        divergence = tf.reduce_sum(divs) / batch_size
         tf.summary.scalar("divergence", divergence)
         elbo = log_prob - divergence
         tf.summary.scalar("elbo", elbo)

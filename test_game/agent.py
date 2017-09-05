@@ -3,6 +3,7 @@
 import numpy as np
 import tensorflow as tf
 from vae_seq import agent as agent_mod
+from vae_seq import util
 
 from . import game as game_mod
 
@@ -48,17 +49,16 @@ class Agent(agent_mod.Agent):
             self._inner_agent.initial_state(batch_size),)
 
     def observe(self, agent_input, observation, state):
-        hparams = self._hparams
+        batch_size = util.batch_size(self._hparams)
         _unused_prev_action, inner_state = state
         if not self.interactive:
             actions = tf.random_uniform(
-                [hparams.batch_size], 0, len(game_mod.ACTIONS), dtype=tf.int32)
+                [batch_size], 0, len(game_mod.ACTIONS), dtype=tf.int32)
         else:
             single_action, = tf.py_func(
                 input_action, [observation[0, :]], [tf.int32])
             single_action.set_shape([])
-            actions = tf.tile(
-                tf.expand_dims(single_action, 0), [hparams.batch_size])
+            actions = tf.tile(tf.expand_dims(single_action, 0), [batch_size])
         inner_state = self._inner_agent.observe(agent_input, observation,
                                                 inner_state)
         return (actions, inner_state)
@@ -76,8 +76,9 @@ class Agent(agent_mod.Agent):
         return actions
 
     def inputs(self):
-        hparams = self._hparams
-        return agent_mod.null_inputs(hparams.batch_size, hparams.sequence_size)
+        return agent_mod.null_inputs(
+            util.batch_size(self._hparams),
+            util.sequence_size(self._hparams))
 
     def contexts_and_observations(self, env):
         return agent_mod.contexts_and_observations_from_environment(

@@ -44,7 +44,7 @@ class MLPObsEncoder(snt.AbstractModule):
 
 
 class OneHotObsDecoder(snt.AbstractModule):
-    """inputs -> Categorical(observed; logits=mlp(inputs))"""
+    """Inputs -> Categorical(observed; logits=mlp(inputs))"""
 
     def __init__(self, hparams, name=None):
         super(OneHotObsDecoder, self).__init__(name=name)
@@ -58,6 +58,7 @@ class OneHotObsDecoder(snt.AbstractModule):
         logits = tf.reshape(
             mlp(util.concat_features(inputs)),
             [-1] + hparams.obs_shape)
+        logits.set_shape([None] + hparams.obs_shape)
         return logits
 
     @staticmethod
@@ -68,7 +69,7 @@ class OneHotObsDecoder(snt.AbstractModule):
 
     def dist(self, *inputs):
         """Returns p(obs | inputs)."""
-        return self.output_dist(self(*inputs), name=self.module_name + "Dist")
+        return self.output_dist(self(*inputs), name=self.module_name + "_dist")
 
     @property
     def event_dtype(self):

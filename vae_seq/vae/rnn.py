@@ -81,19 +81,26 @@ class NoEventsDist(distributions.Distribution):
     """A partial implementation of dirac(null-event)."""
 
     def __init__(self, batch_shape, dtype=tf.float32, name=None):
+        name = name or "NoEventsDist"
         super(NoEventsDist, self).__init__(
             dtype=dtype,
             reparameterization_type=distributions.NOT_REPARAMETERIZED,
             validate_args=False,
             allow_nan_stats=False,
-            name=name or 'NoEventsDist')
-        self._batch_shape_val = tf.TensorShape(batch_shape)
+            name=name)
+        with tf.name_scope(name, values=[batch_shape]):
+            self._batch_shape_param = tf.convert_to_tensor(
+                batch_shape, name="batch_shape", dtype=tf.int32)
+
+    def _batch_shape_tensor(self):
+        return self._batch_shape_param
 
     def _batch_shape(self):
-        return self._batch_shape_val
+        return tf.TensorShape(
+            [None] * self._batch_shape_param.get_shape().ndims)
 
     def _sample_n(self, n, seed=None):
-        shape = [n] + self.batch_shape.as_list() + [0]
+        shape = tf.concat([[n], self.batch_shape_tensor(), [0]], axis=0)
         return tf.zeros(shape)
 
 
@@ -119,7 +126,7 @@ class NoLatents(base.DistCore):
     def _build_dist(self, context, state):
         del context, state  # The latent distribution is constant.
         hparams = self._hparams
-        dist = NoEventsDist([hparams.batch_size])
+        dist = NoEventsDist([util.batch_size(hparams)])
         return dist, ()
 
     def _next_state(self, state_arg, event=None):
