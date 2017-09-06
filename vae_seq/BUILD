@@ -42,14 +42,14 @@ py_test(
     srcs = ["agent_test.py"],
     deps = [
         ":agent",
-        ":obs_layers",
+        ":codec",
         ":hparams",
     ],
 )
 
 py_library(
-    name = "obs_layers",
-    srcs = ["obs_layers.py"],
+    name = "codec",
+    srcs = ["codec.py"],
     deps = [
         ":util",
     ],

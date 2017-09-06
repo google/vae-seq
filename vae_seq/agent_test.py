@@ -4,7 +4,7 @@ import tensorflow as tf
 
 from vae_seq import agent as agent_mod
 from vae_seq import hparams as hparams_mod
-from vae_seq import obs_layers
+from vae_seq import codec
 
 
 class TestEnvironment(agent_mod.Environment):
@@ -32,7 +32,7 @@ class TestEnvironment(agent_mod.Environment):
 def _make_agent():
     """Returns an agent that passes through the last observation as context."""
     hparams = hparams_mod.make_hparams(obs_shape=[1])
-    return agent_mod.EncodeObsAgent(obs_layers.IdentityObsEncoder(hparams))
+    return agent_mod.EncodeObsAgent(codec.IdentityObsEncoder(hparams))
 
 
 class AgentTest(tf.test.TestCase):

@@ -4,15 +4,15 @@ import tensorflow as tf
 
 from vae_seq import agent as agent_mod
 from vae_seq import hparams as hparams_mod
-from vae_seq import obs_layers
+from vae_seq import codec
 from vae_seq import util
 from vae_seq import vae as vae_mod
 
 
 def _build_vae(hparams):
     """Constructs a VAE."""
-    obs_encoder = obs_layers.MLPObsEncoder(hparams)
-    obs_decoder = obs_layers.OneHotObsDecoder(hparams)
+    obs_encoder = codec.MLPObsEncoder(hparams)
+    obs_decoder = codec.OneHotObsDecoder(hparams)
     agent = agent_mod.EncodeObsAgent(obs_encoder)
     return vae_mod.make(hparams, agent, obs_encoder, obs_decoder)
 

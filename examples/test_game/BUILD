@@ -47,7 +47,7 @@ py_library(
         ":environment",
         ":game",
         "//vae_seq/vae",
-        "//vae_seq:obs_layers",
+        "//vae_seq:codec",
         "//vae_seq:train",
     ],
 )
