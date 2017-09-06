@@ -2,8 +2,8 @@
 
 import tensorflow as tf
 
-from test_game import hparams as hparams_mod
-from test_game import model
+from examples.test_game import hparams as hparams_mod
+from examples.test_game import model
 
 
 def _hparams(vae_type):

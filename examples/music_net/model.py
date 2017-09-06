@@ -47,7 +47,7 @@ def flatten_samples(hparams, sequences):
         sequences,
         [util.batch_size(hparams),
          util.sequence_size(hparams) * hparams.samples_per_step])
-    
+
 
 def train(hparams, dataset, log_dir, num_steps):
     """Trains/continues training a VAE and saves it in log_dir."""

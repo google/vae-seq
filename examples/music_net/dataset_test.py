@@ -5,7 +5,7 @@ import os.path
 import numpy as np
 import tensorflow as tf
 
-from music_net import dataset as dataset_mod
+from examples.music_net import dataset as dataset_mod
 
 
 class DatasetTest(tf.test.TestCase):
