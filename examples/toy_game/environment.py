@@ -35,8 +35,8 @@ class Environment(agent_mod.Environment):
             return np.array(
                 [
                     pickle.dumps(
-                        game_mod.Game(hparams.test_game_width,
-                                      hparams.test_game_classes))
+                        game_mod.Game(hparams.toy_game_width,
+                                      hparams.toy_game_classes))
                     for _ in range(batch_size)
                 ],
                 dtype=object)

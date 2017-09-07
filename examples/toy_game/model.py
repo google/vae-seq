@@ -28,7 +28,7 @@ def display(actions, latents, observed):
 
 
 def make_vae(hparams):
-    """Constructs a VAE for modelling test games."""
+    """Constructs a VAE for modeling test games."""
     with tf.name_scope("vae"):
         obs_encoder = codec.MLPObsEncoder(hparams)
         obs_decoder = codec.OneHotObsDecoder(hparams)
