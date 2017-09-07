@@ -20,6 +20,7 @@ import tensorflow as tf
 from tensorflow.contrib import distributions
 
 from . import base
+from .. import dist_module
 from .. import util
 
 class RNN(base.VAEBase):
@@ -47,7 +48,7 @@ class RNN(base.VAEBase):
         return latents, divs
 
 
-class ObsDist(base.DistCore):
+class ObsDist(dist_module.DistCore):
     """DistCore for producing p(observation | context, latent)."""
 
     def __init__(self, hparams, d_core, obs_decoder, name=None):
@@ -68,13 +69,17 @@ class ObsDist(base.DistCore):
     def event_dtype(self):
         return self._obs_decoder.event_dtype
 
-    def _build_dist(self, (context, latent), d_state):
-        del latent  # The latent variable is empty (has zero size).
-        d_out, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._obs_decoder.dist(d_out), d_state
+    def dist(self, params):
+        return self._obs_decoder.dist(params)
 
     def _next_state(self, d_state, event=None):
         return d_state
+
+    def _build(self, inputs, d_state):
+        context, latent = inputs
+        del latent  # The latent variable is empty (has zero size).
+        d_out, d_state = self._d_core(util.concat_features(context), d_state)
+        return self._obs_decoder(d_out), d_state
 
 
 class NoEventsDist(distributions.Distribution):
@@ -104,7 +109,7 @@ class NoEventsDist(distributions.Distribution):
         return tf.zeros(shape)
 
 
-class NoLatents(base.DistCore):
+class NoLatents(dist_module.DistCore):
     """DistCore that samples an empty latent state."""
 
     def __init__(self, hparams, name=None):
@@ -123,11 +128,14 @@ class NoLatents(base.DistCore):
     def event_dtype(self):
         return tf.float32
 
-    def _build_dist(self, context, state):
-        del context, state  # The latent distribution is constant.
-        hparams = self._hparams
-        dist = NoEventsDist([util.batch_size(hparams)])
-        return dist, ()
+    def dist(self, params, name=None):
+        del params  # No parameters needed.
+        return NoEventsDist([util.batch_size(self._hparams)])
 
     def _next_state(self, state_arg, event=None):
+        del state_arg  # No state needed.
         return ()
+
+    def _build(self, context, state):
+        del context, state
+        return (), ()

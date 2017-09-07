@@ -44,6 +44,7 @@ py_library(
     name = "codec",
     srcs = ["codec.py"],
     deps = [
+        "//vae_seq:dist_module",
         "//vae_seq:util",
     ],
 )

@@ -4,6 +4,7 @@ import functools
 import numpy as np
 import tensorflow as tf
 import sonnet as snt
+from vae_seq import dist_module
 from vae_seq import util
 
 
@@ -37,7 +38,7 @@ class AudioObsEncoder(snt.AbstractModule):
         return snt.Sequential(layers)(samples)
 
 
-class AudioObsDecoder(snt.AbstractModule):
+class AudioObsDecoder(dist_module.DistModule):
     """Inputs -> Diagonal MVN(observed; mu, var).
 
     The parameters of mu and var are determined by a decoder MLP,
@@ -47,6 +48,18 @@ class AudioObsDecoder(snt.AbstractModule):
     def __init__(self, hparams, name=None):
         super(AudioObsDecoder, self).__init__(name=name)
         self._hparams = hparams
+
+    @property
+    def event_dtype(self):
+        """The data type of the observations."""
+        return tf.float32
+
+    def dist(self, params, name=None):
+        """Constructs a Distribution from the output of the module."""
+        loc, scale = params
+        name = name or self.module_name + "_dist"
+        return tf.contrib.distributions.MultivariateNormalDiag(
+            loc, scale, name=name)
 
     def _build(self, *inputs):
         hparams = self._hparams
@@ -80,18 +93,3 @@ class AudioObsDecoder(snt.AbstractModule):
         params = snt.Sequential(layers)(inputs)
         loc, unproj_scale = tf.unstack(params, axis=2)
         return loc, util.positive_projection(hparams)(unproj_scale)
-
-    @staticmethod
-    def output_dist((loc, scale), name=None):
-        """Constructs a Distribution from the output of the module."""
-        return tf.contrib.distributions.MultivariateNormalDiag(
-            loc, scale, name=name)
-
-    def dist(self, *inputs):
-        """Returns p(obs | inputs)."""
-        return self.output_dist(self(*inputs), name=self.module_name + "_dist")
-
-    @property
-    def event_dtype(self):
-        """The data type of the observations."""
-        return tf.float32

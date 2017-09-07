@@ -30,6 +30,7 @@ import tensorflow as tf
 
 from . import base
 from . import latent as latent_mod
+from .. import dist_module
 from .. import util
 
 class SRNN(base.VAEBase):
@@ -69,11 +70,12 @@ class SRNN(base.VAEBase):
 
         def _inf_step((d_out, e_out), prev_latent):
             """Iterate over d_1:T and e_1:T to produce z_1:T."""
-            p_z = self._latent_p.dist(d_out, prev_latent)
+            p_z_params = self._latent_p(d_out, prev_latent)
+            p_z = self._latent_p.dist(p_z_params)
             q_loc, q_scale = self._latent_q(e_out, prev_latent)
             if hparams.srnn_use_res_q:
                 q_loc += p_z.loc
-            q_z = self._latent_q.output_dist((q_loc, q_scale), name="q_z_dist")
+            q_z = self._latent_q.dist((q_loc, q_scale), name="q_z_dist")
             latent = q_z.sample()
             divergence = util.calc_kl(hparams, latent, q_z, p_z)
             return (latent, divergence), latent
@@ -92,7 +94,7 @@ class SRNN(base.VAEBase):
         return latents, kls
 
 
-class ObsDist(base.DistCore):
+class ObsDist(dist_module.DistCore):
     """DistCore for producing p(observation | context, latent)."""
 
     def __init__(self, hparams, d_core, obs_decoder, name=None):
@@ -113,15 +115,19 @@ class ObsDist(base.DistCore):
     def event_dtype(self):
         return self._obs_decoder.event_dtype
 
-    def _build_dist(self, (context, latent), d_state):
-        d_out, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._obs_decoder.dist(d_out, latent), d_state
+    def dist(self, params):
+        return self._obs_decoder.dist(params)
 
     def _next_state(self, d_state, event=None):
         return d_state
 
+    def _build(self, inputs, d_state):
+        context, latent = inputs
+        d_out, d_state = self._d_core(util.concat_features(context), d_state)
+        return self._obs_decoder(d_out, latent), d_state
 
-class LatentPrior(base.DistCore):
+
+class LatentPrior(dist_module.DistCore):
     """DistCore that produces Normal latent variables."""
 
     def __init__(self, hparams, d_core, latent_p, name=None):
@@ -143,10 +149,13 @@ class LatentPrior(base.DistCore):
     def event_dtype(self):
         return self._latent_p.event_dtype
 
-    def _build_dist(self, context, state):
-        prev_latent, d_state = state
-        d_out, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._latent_p.dist(d_out, prev_latent), d_state
+    def dist(self, params):
+        return self._latent_p.dist(params)
 
     def _next_state(self, d_state, event=None):
         return (event, d_state)
+
+    def _build(self, context, state):
+        prev_latent, d_state = state
+        d_out, d_state = self._d_core(util.concat_features(context), d_state)
+        return self._latent_p(d_out, prev_latent), d_state

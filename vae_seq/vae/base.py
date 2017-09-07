@@ -5,70 +5,8 @@ import tensorflow as tf
 import sonnet as snt
 
 from .. import agent as agent_mod
+from .. import dist_module
 from .. import util
-
-class DistCore(snt.AbstractModule):
-    """Like an RNNCore, but outputs distributions."""
-
-    @abc.abstractproperty
-    def state_size(self):
-        """Returns the non-batched sizes of Tensors returned from next_state."""
-
-    @abc.abstractproperty
-    def event_size(self):
-        """Returns the output distribution event sizes."""
-
-    @abc.abstractproperty
-    def event_dtype(self):
-        """Returns the output distribution event dtypes."""
-
-    @property
-    def samples(self):
-        """Returns an RNNCore that outputs samples."""
-        def _step(input_, state):
-            """Samples from the distribution at each time step."""
-            dist, state_arg = self(input_, state)
-            event = dist.sample()
-            event.set_shape(
-                tf.TensorShape([None]).concatenate(dist.event_shape))
-            state = self._next_state(state_arg, event)
-            return event, state
-        return util.WrapRNNCore(
-            _step,
-            self.state_size,
-            output_size=self.event_size,
-            name=self.module_name + "/samples")
-
-    @property
-    def log_probs(self):
-        """Returns an RNNCore that outputs log-probabilities."""
-        def _step((input_, observed), state):
-            """Calculates the log-probability of the observed event."""
-            dist, state_arg = self(input_, state)
-            state = self._next_state(state_arg, observed)
-            return dist.log_prob(observed), state
-        return util.WrapRNNCore(
-            _step,
-            self.state_size,
-            output_size=tf.TensorShape([]),
-            name=self.module_name + "/log_probs")
-
-    @abc.abstractmethod
-    def _build_dist(self, input_, state):
-        """Returns a distribution and a state_arg"""
-        return
-
-    @abc.abstractmethod
-    def _next_state(self, state_arg, event=None):
-        """Produces the next state given a state_arg and event.
-        NOTE: this function shouldn't allocate variables."""
-        return
-
-    def _build(self, input_, state):
-        ret, state_arg = self._build_dist(input_, state)
-        assert all(isinstance(out, tf.contrib.distributions.Distribution)
-                   for out in snt.nest.flatten(ret))
-        return ret, state_arg
 
 
 class GenCore(snt.RNNCore):
@@ -77,8 +15,8 @@ class GenCore(snt.RNNCore):
     def __init__(self, agent, latent_distcore, obs_distcore, name=None):
         super(GenCore, self).__init__(name=name)
         assert isinstance(agent, agent_mod.Agent)
-        assert isinstance(latent_distcore, DistCore)
-        assert isinstance(obs_distcore, DistCore)
+        assert isinstance(latent_distcore, dist_module.DistCore)
+        assert isinstance(obs_distcore, dist_module.DistCore)
         self._agent = agent
         self._latent_distcore = latent_distcore
         self._obs_distcore = obs_distcore

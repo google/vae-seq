@@ -3,7 +3,9 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "base",
     srcs = ["base.py"],
-    deps = [],
+    deps = [
+        "//vae_seq:dist_module",
+    ],
 )
 
 py_library(
@@ -20,6 +22,7 @@ py_library(
     deps = [
         ":base",
         ":latent",
+        "//vae_seq:dist_module",
         "//vae_seq:util",
     ],
 )
@@ -29,6 +32,7 @@ py_library(
     srcs = ["rnn.py"],
     deps = [
         ":base",
+        "//vae_seq:dist_module",
         "//vae_seq:util",
     ],
 )
@@ -39,6 +43,7 @@ py_library(
     deps = [
         ":base",
         ":latent",
+        "//vae_seq:dist_module",
         "//vae_seq:util",
     ],
 )

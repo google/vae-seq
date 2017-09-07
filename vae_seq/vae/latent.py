@@ -2,16 +2,28 @@
 
 import sonnet as snt
 import tensorflow as tf
-from tensorflow.contrib import distributions
 
+from .. import dist_module
 from .. import util
 
-class LatentDecoder(snt.AbstractModule):
+
+class LatentDecoder(dist_module.DistModule):
     """Inputs -> P(latent | inputs)"""
 
     def __init__(self, hparams, name=None):
         super(LatentDecoder, self).__init__(name=name)
         self._hparams = hparams
+
+    @property
+    def event_dtype(self):
+        """The data type of the latent variables."""
+        return tf.float32
+
+    def dist(self, params, name=None):
+        loc, scale_diag = params
+        name = name or self.module_name + "_dist"
+        return tf.contrib.distributions.MultivariateNormalDiag(
+            loc, scale_diag, name=name)
 
     def _build(self, *inputs):
         hparams = self._hparams
@@ -23,17 +35,3 @@ class LatentDecoder(snt.AbstractModule):
         scale = util.positive_projection(hparams)(
             dist_params[:, hparams.latent_size:])
         return (loc, scale)
-
-    @staticmethod
-    def output_dist((loc, scale_diag), name=None):
-        """Constructs a Distrubution from the output of the module."""
-        return distributions.MultivariateNormalDiag(loc, scale_diag, name=name)
-
-    def dist(self, *inputs):
-        """Returns p(latent | inputs)."""
-        return self.output_dist(self(*inputs), name=self.module_name + "_dist")
-
-    @property
-    def event_dtype(self):
-        """The data type of the latent variables."""
-        return tf.float32

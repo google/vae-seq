@@ -26,6 +26,7 @@ from tensorflow.contrib import distributions
 
 from . import base
 from . import latent as latent_mod
+from .. import dist_module
 from .. import util
 
 class IndependentSequence(base.VAEBase):
@@ -59,7 +60,7 @@ class IndependentSequence(base.VAEBase):
             self._f_core,
             e_outs,
             initial_state=self._f_core.initial_state(batch_size))
-        q_zs = self._q_z.output_dist(
+        q_zs = self._q_z.dist(
             snt.BatchApply(self._q_z, n_dims=2)(f_outs),
             name="q_zs")
         latents = q_zs.sample()
@@ -71,7 +72,7 @@ class IndependentSequence(base.VAEBase):
         return latents, divs
 
 
-class ObsDist(base.DistCore):
+class ObsDist(dist_module.DistCore):
     """DistCore for producing p(observation | context, latent)."""
 
     def __init__(self, hparams, d_core, obs_decoder, name=None):
@@ -92,15 +93,19 @@ class ObsDist(base.DistCore):
     def event_dtype(self):
         return self._obs_decoder.event_dtype
 
-    def _build_dist(self, (context, latent), d_state):
-        d_out, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._obs_decoder.dist(d_out, latent), d_state
+    def dist(self, params):
+        return self._obs_decoder.dist(params)
 
     def _next_state(self, d_state, event=None):
         return d_state
 
+    def _build(self, inputs, d_state):
+        context, latent = inputs
+        d_out, d_state = self._d_core(util.concat_features(context), d_state)
+        return self._obs_decoder(d_out, latent), d_state
 
-class LatentPrior(base.DistCore):
+
+class LatentPrior(dist_module.DistCore):
     """DistCore that samples standard normal latents."""
 
     def __init__(self, hparams, name=None):
@@ -127,9 +132,14 @@ class LatentPrior(base.DistCore):
     def event_dtype(self):
         return self._dist.dtype
 
-    def _build_dist(self, context, state):
-        del context, state  # The latent distribution is constant.
-        return self._dist, ()
+    def dist(self, params):
+        del params  # The latent distribution is constant.
+        return self._dist
 
     def _next_state(self, state_arg, event=None):
+        del state_arg, event  # No state.
         return ()
+
+    def _build(self, context, state):
+        del context, state  # No state or context needed.
+        return (), ()

@@ -11,6 +11,11 @@ test_suite(
 )
 
 py_library(
+    name = "dist_module",
+    srcs = ["dist_module.py"],
+)
+
+py_library(
     name = "hparams",
     srcs = ["hparams.py"],
 )
@@ -51,6 +56,7 @@ py_library(
     name = "codec",
     srcs = ["codec.py"],
     deps = [
+        ":dist_module",
         ":util",
     ],
 )
