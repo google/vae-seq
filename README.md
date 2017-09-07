@@ -77,7 +77,8 @@ $ bazel run -c opt //examples/toy_game:train -- \
 
 Then you can play the modeled game:
 ```shell
-$ bazel run -c opt //examples/toy_game:play -- \
+$ bazel build -c opt //examples/toy_game:play && \
+  bazel-bin/examples/toy_game/play \
     --log_dir /tmp/toy_game \
     --hparams "vae_type=SRNN"  # make sure to keep the same HPARAMS
 ```
