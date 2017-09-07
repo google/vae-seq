@@ -9,7 +9,7 @@ a sequence of *observations*. An observation could be a frame in a
 game being played, a window of samples from an audio file, or the
 price of a stock at a certain time.
 
-Our model for the probability of an observation at a given depends on:
+Our model for the probability of an observation at a given step depends on:
 
   * *Latent variables*, both deterministic and stochastic.
   * A *context* that encodes input from the environment.
@@ -95,4 +95,8 @@ are sequences of 200 samples at 16000 HZ audio rate.
 The agent context is just an encoding of the previous observation, and
 we use `agent.contexts_for_static_observations` to generate the
 contexts for training.
+
+## Disclaimer
+
+This is not an official Google product.
 
