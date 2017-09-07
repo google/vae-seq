@@ -132,3 +132,7 @@ expect it to sound great.
 An experiment modeling a game environment and using that to train an
 agent via policy gradient. This example uses the OpenAI Gym
 module. Installed under `vaeseq-play`.
+
+## Disclaimer
+
+This is not an official Google product.
