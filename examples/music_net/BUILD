@@ -3,6 +3,7 @@ test_suite(
     tests = [
         "agent_test",
         "dataset_test",
+        "model_test",
     ],
 )
 
@@ -66,6 +67,17 @@ py_library(
         "//vae_seq/vae",
         "//vae_seq:hparams",
         "//vae_seq:train",
+        "//vae_seq:util",
+    ],
+)
+
+py_test(
+    name = "model_test",
+    srcs = ["model_test.py"],
+    deps = [
+        ":dataset",
+        ":hparams",
+        ":model",
         "//vae_seq:util",
     ],
 )

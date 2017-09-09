@@ -1,9 +1,11 @@
 """Tests for training and generating graphs."""
 
 import tensorflow as tf
+from vae_seq import util
 
-from examples.toy_game import hparams as hparams_mod
-from examples.toy_game import model
+from examples.music_net import dataset as dataset_mod
+from examples.music_net import hparams as hparams_mod
+from examples.music_net import model
 
 
 def _hparams(vae_type):
@@ -14,15 +16,30 @@ def _hparams(vae_type):
     return hparams
 
 
+def _dataset(hparams):
+    """Mock dataset used to test trainign."""
+    sequence_size = util.sequence_size(hparams)
+    return dataset_mod.dataset_from_sequences(
+        [tf.zeros([sequence_size * 2])],
+        util.batch_size(hparams),
+        hparams.samples_per_step,
+        sequence_size)
+
+
 class ModelTest(tf.test.TestCase):
 
     def _test_training(self, vae_type):
         """Test the training graph for the given VAE type."""
         hparams = _hparams(vae_type)
         vae = model.make_vae(hparams)
-        train_op, debug_tensors = model.train_graph(hparams, vae)
+        dataset = _dataset(hparams)
+        iterator = tf.contrib.data.Iterator.from_dataset(dataset)
+        observed, offsets = iterator.get_next()
+        train_op, debug_tensors = model.train_graph(
+            hparams, vae, observed, offsets)
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
+            sess.run(iterator.initializer)
             debug_vals = sess.run(debug_tensors)
             self.assertLessEqual(debug_vals["log_prob"], 0)
             self.assertGreaterEqual(debug_vals["divergence"], 0)
@@ -35,10 +52,10 @@ class ModelTest(tf.test.TestCase):
         """Test the generation graph for the given VAE type."""
         hparams = _hparams(vae_type)
         vae = model.make_vae(hparams)
-        env_inputs, latents, generated = model.gen_graph(hparams, vae)
+        generated = model.gen_graph(hparams, vae)
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
-            sess.run([env_inputs, latents, generated])
+            sess.run(generated)
 
     def test_training_iseq(self):
         self._test_training("ISEQ")

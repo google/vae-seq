@@ -49,6 +49,8 @@ def _test_assertions(inf_tensors, gen_tensors):
     observed, latents, divs, log_probs, elbo = inf_tensors
     generated, sampled_latents = gen_tensors
     assertions = [
+        tf.assert_non_negative(divs),
+        tf.assert_non_positive(log_probs),
         tf.assert_equal(
             tf.shape(observed), tf.shape(generated),
             message="Shapes: training data vs. generated data"),
