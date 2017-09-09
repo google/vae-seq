@@ -24,7 +24,6 @@ class ModelTest(tf.test.TestCase):
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             debug_vals = sess.run(debug_tensors)
-            self.assertLessEqual(debug_vals["log_prob"], 0)
             self.assertGreaterEqual(debug_vals["divergence"], 0)
             for _ in range(100):
                 sess.run(train_op)
