@@ -56,6 +56,31 @@ model to get an observation.
 
 ## Examples
 
+### Text
+
+A character-sequence model that can be used to generate nonsense text
+or to evaluate the probability that a given piece of text was written
+by a given author.
+
+To train on Andrej Karpathy's "Tiny Shakespeare" dataset:
+```shell
+$ wget https://github.com/karpathy/char-rnn/raw/master/data/tinyshakespeare/input.txt
+$ bazel run -c opt //examples/text:train -- \
+    --train_corpus input.txt \
+    --log_dir /tmp/text \
+    --hparams "vae_type=SRNN,sequence_size=40" \
+    --iters 1000000
+```
+
+After training has completed, you can generate text:
+```shell
+$ bazel run -c opt //examples/text:generate -- \
+    --train_corpus input.txt \
+    --log_dir /tmp/text \
+    --hparams "vae_type=SRNN,sequence_size=1000" \
+    --samples 20
+```
+
 ### Toy Game
 
 In `examples/toy_game`, we model a (very) simple partially observable
