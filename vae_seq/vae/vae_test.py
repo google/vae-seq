@@ -44,10 +44,20 @@ def _gen_tensors(hparams, gen_core):
     return [generated, sampled_latents]
 
 
-def _test_assertions(inf_tensors, gen_tensors):
+def _eval_tensors(hparams, eval_core):
+    """Calculates the log-probabilities of the observations."""
+    observed = _observed(hparams)
+    agent_inputs = agent_mod.null_inputs(
+        util.batch_size(hparams), util.sequence_size(hparams))
+    log_probs = eval_core.log_probs(agent_inputs, observed)
+    return [log_probs]
+
+
+def _test_assertions(inf_tensors, gen_tensors, eval_tensors):
     """Returns in-graph assertions for testing."""
     observed, latents, divs, log_probs, elbo = inf_tensors
     generated, sampled_latents = gen_tensors
+    eval_log_probs, = eval_tensors
     assertions = [
         tf.assert_non_negative(divs),
         tf.assert_non_positive(log_probs),
@@ -60,6 +70,9 @@ def _test_assertions(inf_tensors, gen_tensors):
         tf.assert_equal(
             tf.shape(divs), tf.shape(log_probs),
             message="Shapes: divergences vs. log-probs"),
+        tf.assert_equal(
+            tf.shape(log_probs), tf.shape(eval_log_probs),
+            message="Shapes: log-probs from inference vs. eval"),
         tf.assert_equal(
             tf.shape(observed)[:2], tf.shape(latents)[:2],
             message="Batch & steps: observed vs latents"),
@@ -84,8 +97,9 @@ def _all_tensors(hparams, vae):
     """All tensors to evaluate in tests."""
     inf_tensors = _inf_tensors(hparams, vae)
     gen_tensors = _gen_tensors(hparams, vae.gen_core)
-    assertions = _test_assertions(inf_tensors, gen_tensors)
-    return inf_tensors, gen_tensors, assertions
+    eval_tensors = _eval_tensors(hparams, vae.eval_core)
+    assertions = _test_assertions(inf_tensors, gen_tensors, eval_tensors)
+    return inf_tensors + gen_tensors + eval_tensors + assertions
 
 
 class VAETest(tf.test.TestCase):
@@ -94,10 +108,10 @@ class VAETest(tf.test.TestCase):
         """Make sure that all tensors and assertions evaluate without error."""
         hparams = hparams_mod.make_hparams(obs_shape=[2], vae_type=vae_type)
         vae = _build_vae(hparams)
-        inf_tensors, gen_tensors, assertions = _all_tensors(hparams, vae)
+        tensors = _all_tensors(hparams, vae)
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
-            sess.run(inf_tensors + gen_tensors + assertions)
+            sess.run(tensors)
 
     def test_iseq(self):
         self._test_vae("ISEQ")

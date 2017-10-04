@@ -1,10 +1,10 @@
-"""Module parameterizing VAE latent variables."""
+"""Module parameterizing latent variables."""
 
 import sonnet as snt
 import tensorflow as tf
 
-from .. import dist_module
-from .. import util
+from . import dist_module
+from . import util
 
 
 class LatentDecoder(dist_module.DistModule):

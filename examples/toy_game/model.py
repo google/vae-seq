@@ -2,7 +2,6 @@
 
 import tensorflow as tf
 
-from vae_seq import hparams as hparams_mod
 from vae_seq import codec
 from vae_seq import train as train_mod
 from vae_seq import vae as vae_mod

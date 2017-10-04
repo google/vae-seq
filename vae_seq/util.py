@@ -31,8 +31,8 @@ def positive_projection(hparams):
 def make_rnn(hparams, name):
     """Constructs a DeepRNN using hparams.rnn_hidden_sizes."""
     with tf.variable_scope(name):
-        return snt.DeepRNN(
-            [snt.LSTM(size) for size in hparams.rnn_hidden_sizes], name=name)
+        layers = [snt.LSTM(size) for size in hparams.rnn_hidden_sizes]
+        return snt.DeepRNN(layers, skip_connections=False, name=name)
 
 
 def make_mlp(hparams, layers, name=None):
@@ -70,6 +70,28 @@ class WrapRNNCore(snt.RNNCore):
 
     def _build(self, input_, state):
         return self._step(input_, state)
+
+
+def add_support_for_scalar_rnn_inputs(cell, inputs):
+    """Wraps a cell to add support for scalar RNN inputs."""
+    flat_inputs = snt.nest.flatten(inputs)
+    flat_input_is_scalar = [inp.get_shape().ndims == 2 for inp in flat_inputs]
+    if not any(flat_input_is_scalar):
+        return cell, inputs
+    inputs = snt.nest.pack_sequence_as(
+        inputs,
+        [tf.expand_dims(inp, axis=-1) if is_scalar else inp
+         for inp, is_scalar in zip(flat_inputs, flat_input_is_scalar)])
+    is_scalar = snt.nest.pack_sequence_as(inputs, flat_input_is_scalar)
+
+    def _squeeze(input_, is_scalar):
+        return tf.squeeze(input_, axis=-1) if is_scalar else input_
+
+    ret_cell = WrapRNNCore(
+        lambda inp, state: cell(snt.nest.map(_squeeze, inp, is_scalar), state),
+        state_size=cell.state_size,
+        output_size=cell.output_size)
+    return ret_cell, inputs
 
 
 def heterogeneous_dynamic_rnn(

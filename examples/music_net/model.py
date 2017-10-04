@@ -1,9 +1,7 @@
 """Functions to build up training and generation graphs."""
 
 import tensorflow as tf
-import sonnet as snt
 
-from vae_seq import hparams as hparams_mod
 from vae_seq import train as train_mod
 from vae_seq import util
 from vae_seq import vae as vae_mod

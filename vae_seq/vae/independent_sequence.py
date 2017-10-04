@@ -25,8 +25,8 @@ import tensorflow as tf
 from tensorflow.contrib import distributions
 
 from . import base
-from . import latent as latent_mod
 from .. import dist_module
+from .. import latent as latent_mod
 from .. import util
 
 class IndependentSequence(base.VAEBase):

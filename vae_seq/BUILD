@@ -16,6 +16,35 @@ py_library(
 )
 
 py_library(
+    name = "latent",
+    srcs = ["latent.py"],
+    deps = [
+         ":dist_module",
+         ":util",
+    ],
+)
+
+py_library(
+    name = "gen_core",
+    srcs = ["gen_core.py"],
+    deps = [
+         ":agent",
+         ":dist_module",
+         ":util",
+    ],
+)
+
+py_library(
+    name = "eval_core",
+    srcs = ["eval_core.py"],
+    deps = [
+         ":agent",
+         ":dist_module",
+         ":util",
+    ],
+)
+
+py_library(
     name = "hparams",
     srcs = ["hparams.py"],
 )

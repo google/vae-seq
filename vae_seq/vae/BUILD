@@ -4,14 +4,8 @@ py_library(
     name = "base",
     srcs = ["base.py"],
     deps = [
-        "//vae_seq:dist_module",
-    ],
-)
-
-py_library(
-    name = "latent",
-    srcs = ["latent.py"],
-    deps = [
+        "//vae_seq:eval_core",
+        "//vae_seq:gen_core",
         "//vae_seq:util",
     ],
 )
@@ -21,8 +15,8 @@ py_library(
     srcs = ["independent_sequence.py"],
     deps = [
         ":base",
-        ":latent",
         "//vae_seq:dist_module",
+        "//vae_seq:latent",
         "//vae_seq:util",
     ],
 )
@@ -42,8 +36,8 @@ py_library(
     srcs = ["srnn.py"],
     deps = [
         ":base",
-        ":latent",
         "//vae_seq:dist_module",
+        "//vae_seq:latent",
         "//vae_seq:util",
     ],
 )

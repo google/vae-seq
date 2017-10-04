@@ -29,8 +29,8 @@ import sonnet as snt
 import tensorflow as tf
 
 from . import base
-from . import latent as latent_mod
 from .. import dist_module
+from .. import latent as latent_mod
 from .. import util
 
 class SRNN(base.VAEBase):

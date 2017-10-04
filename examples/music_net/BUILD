@@ -65,7 +65,6 @@ py_library(
         ":agent",
         ":codec",
         "//vae_seq/vae",
-        "//vae_seq:hparams",
         "//vae_seq:train",
         "//vae_seq:util",
     ],

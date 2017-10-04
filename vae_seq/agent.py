@@ -107,9 +107,11 @@ def contexts_for_static_observations(observations, agent, agent_inputs):
         state = agent.observe(agent_input, obs, state)
         return context, state
 
+    cell = util.WrapRNNCore(_step, agent.state_size, agent.context_size)
+    inputs = (agent_inputs, observations)
+    cell, inputs = util.add_support_for_scalar_rnn_inputs(cell, inputs)
     contexts, _ = util.heterogeneous_dynamic_rnn(
-        util.WrapRNNCore(_step, agent.state_size, agent.context_size),
-        (agent_inputs, observations),
+        cell, inputs,
         initial_state=initial_state,
         output_dtypes=agent.context_dtype)
     return contexts
@@ -129,12 +131,14 @@ def contexts_and_observations_from_environment(env, agent, agent_inputs):
         agent_state = agent.observe(agent_input, obs, agent_state)
         return (context, obs), (agent_state, env_state)
 
+    cell = util.WrapRNNCore(
+        _step,
+        state_size=(agent.state_size, env.state_size),
+        output_size=(agent.context_size, env.output_size))
+    cell, agent_inputs = util.add_support_for_scalar_rnn_inputs(
+        cell, agent_inputs)
     (contexts, observations), _ = util.heterogeneous_dynamic_rnn(
-        util.WrapRNNCore(
-            _step,
-            state_size=(agent.state_size, env.state_size),
-            output_size=(agent.context_size, env.output_size)),
-        agent_inputs,
+        cell, agent_inputs,
         initial_state=initial_state,
         output_dtypes=(agent.context_dtype, env.output_dtype))
     return contexts, observations
