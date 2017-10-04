@@ -68,8 +68,9 @@ class SRNN(base.VAEBase):
             util.concat_features((enc_observed, contexts)),
             initial_state=self._e_core.initial_state(batch_size))
 
-        def _inf_step((d_out, e_out), prev_latent):
+        def _inf_step(d_e_outputs, prev_latent):
             """Iterate over d_1:T and e_1:T to produce z_1:T."""
+            d_out, e_out = d_e_outputs
             p_z_params = self._latent_p(d_out, prev_latent)
             p_z = self._latent_p.dist(p_z_params)
             q_loc, q_scale = self._latent_q(e_out, prev_latent)

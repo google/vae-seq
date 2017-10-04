@@ -101,8 +101,9 @@ def contexts_for_static_observations(observations, agent, agent_inputs):
     batch_size = tf.shape(agent_inputs)[0]
     initial_state = agent.initial_state(batch_size)
 
-    def _step((agent_input, obs), state):
+    def _step(input_obs, state):
         """Record the agent's context for the given observation."""
+        agent_input, obs = input_obs
         context = agent.context(agent_input, state)
         state = agent.observe(agent_input, obs, state)
         return context, state
@@ -123,8 +124,9 @@ def contexts_and_observations_from_environment(env, agent, agent_inputs):
     initial_state = (agent.initial_state(batch_size),
                      env.initial_state(batch_size))
 
-    def _step(agent_input, (agent_state, env_state)):
+    def _step(agent_input, state):
         """Have the agent manipulate the environment and record what happens."""
+        agent_state, env_state = state
         context = agent.context(agent_input, agent_state)
         env_input = agent.env_input(agent_input, agent_state)
         obs, env_state = env(env_input, env_state)

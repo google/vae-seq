@@ -42,7 +42,8 @@ class EvalCore(snt.RNNCore):
         """Sizes of output tensors."""
         return tf.TensorShape([])  # log_prob
 
-    def _build(self, (input_, obs), state):
+    def _build(self, input_obs, state):
+        input_, obs = input_obs
         agent_state, latent_state, obs_state = state
         context = self._agent.context(input_, agent_state)
         latent, latent_state = self._latent_distcore.samples(

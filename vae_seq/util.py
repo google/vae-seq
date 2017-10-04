@@ -118,8 +118,9 @@ def heterogeneous_dynamic_rnn(
     ]
     aux_state = (0, aux_output_tas, initial_state)
 
-    def _step(input_, (step, aux_output_tas, state)):
+    def _step(input_, aux_state):
         """Wrap the cell to return the first output and store the rest."""
+        step, aux_output_tas, state = aux_state
         outputs, state = cell(input_, state)
         flat_outputs = snt.nest.flatten(outputs)
         aux_output_tas = [

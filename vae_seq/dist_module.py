@@ -56,8 +56,9 @@ class DistCore(DistModule):
     @property
     def log_probs(self):
         """Returns an RNNCore that outputs log-probabilities."""
-        def _step((input_, observed), state):
+        def _step(input_obs, state):
             """Calculates the log-probability of the observed event."""
+            input_, observed = input_obs
             dist_arg, state_arg = self(input_, state)
             dist = self.dist(dist_arg)
             state = self._next_state(state_arg, observed)

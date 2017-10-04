@@ -146,6 +146,6 @@ def generate(hparams, id_to_char, log_dir, num_samples):
         while num < num_samples:
             batch = sess.run(gen_text)[:num_samples - num]
             for sample in batch:
-                print sample
-                print "==========="
+                print(sample)
+                print("===========")
             num += len(batch)

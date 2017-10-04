@@ -41,7 +41,7 @@ class TrainOps(snt.AbstractModule):
         for grad, var in grads_and_vars:
             tag = var.name.replace(":0", "")
             if grad is None:
-                print "WARNING: Gradient for " + tag + " is missing!"
+                print("WARNING: Gradient for " + tag + " is missing!")
                 continue
             tf.summary.histogram(tag, var)
             tf.summary.histogram(tag + "/gradient", grad)

@@ -86,7 +86,7 @@ class Agent(agent_mod.Agent):
 
 
 def input_action(obs):
-    print "OBSERVATION:", list(obs)
+    print("OBSERVATION:", list(obs))
     action_menu = ("[" + ", ".join(
         [str(i) + ": " + action
          for (i, action) in enumerate(game_mod.ACTIONS)]) + "]")
@@ -97,5 +97,5 @@ def input_action(obs):
             assert action >= 0 and action < len(game_mod.ACTIONS)
             break
         except (AssertionError, ValueError):
-            print "Please enter a valid action."
+            print("Please enter a valid action.")
     return action
