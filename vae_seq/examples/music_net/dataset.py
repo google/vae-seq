@@ -82,7 +82,7 @@ def load_musicnet_sequences(
             data = np.load(cache_path)
             files = [fname for fname in data.files]
             loaded_from_cache = True
-        except IOError, err:
+        except IOError as err:
             tf.logging.log(
                 tf.logging.INFO,
                 "Couldn't load cache {}: {}".format(cache_path, err))
@@ -109,7 +109,7 @@ def load_musicnet_sequences(
                     for fname, samples, itree in zip(files, sequences, itrees)
                 }
                 np.savez(cache_path, **cache_contents)
-            except IOError, err:
+            except IOError as err:
                 tf.logging.log(
                     tf.logging.WARN,
                     "Couldn't save cache {}: {}".format(cache_path, err))

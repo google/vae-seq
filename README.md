@@ -65,7 +65,7 @@ by a given author.
 To train on Andrej Karpathy's "Tiny Shakespeare" dataset:
 ```shell
 $ wget https://github.com/karpathy/char-rnn/raw/master/data/tinyshakespeare/input.txt
-$ bazel run -c opt //examples/text:train -- \
+$ bazel run -c opt //vae_seq/examples/text:train -- \
     --train_corpus input.txt \
     --log_dir /tmp/text \
     --hparams "vae_type=SRNN,sequence_size=40" \
@@ -74,7 +74,7 @@ $ bazel run -c opt //examples/text:train -- \
 
 After training has completed, you can generate text:
 ```shell
-$ bazel run -c opt //examples/text:generate -- \
+$ bazel run -c opt //vae_seq/examples/text:generate -- \
     --train_corpus input.txt \
     --log_dir /tmp/text \
     --hparams "vae_type=SRNN,sequence_size=1000" \
@@ -83,9 +83,9 @@ $ bazel run -c opt //examples/text:generate -- \
 
 ### Toy Game
 
-In `examples/toy_game`, we model a (very) simple partially observable
-game environment. See `examples/toy_game/game.py` for the rules, but
-it's not a very fun game.
+In `vae_seq/examples/toy_game`, we model a (very) simple partially
+observable game environment. See `examples/toy_game/game.py` for the
+rules, but it's not a very fun game.
 
 The agent here takes random moves in the game during
 training; we wrap the game implementation in an `agent.Environment` so
@@ -94,7 +94,7 @@ generate the training data.
 
 To train, run:
 ```shell
-$ bazel run -c opt //examples/toy_game:train -- \
+$ bazel run -c opt //vae_seq/examples/toy_game:train -- \
     --log_dir /tmp/toy_game \
     --iters 10000 \
     --hparams "vae_type=SRNN"
@@ -102,16 +102,16 @@ $ bazel run -c opt //examples/toy_game:train -- \
 
 Then you can play the modeled game:
 ```shell
-$ bazel build -c opt //examples/toy_game:play && \
-  bazel-bin/examples/toy_game/play \
+$ bazel build -c opt //vae_seq/examples/toy_game:play && \
+  bazel-bin/vae_seq/examples/toy_game/play \
     --log_dir /tmp/toy_game \
     --hparams "vae_type=SRNN"  # make sure to keep the same HPARAMS
 ```
 
 ### MusicNet
 
-In `examples/music_net`, we model audio samples from the MusicNet
-dataset (see: http://homes.cs.washington.edu/~thickstn/musicnet.html).
+In `vae_seq/examples/music_net`, we model audio samples from the
+MusicNet dataset (see: http://homes.cs.washington.edu/~thickstn/musicnet.html).
 
 Here, we have a static set of observations (unlike in the toy game,
 where our training data depends on the agent's actions). Observations

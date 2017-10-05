@@ -5,7 +5,7 @@ import os.path
 import numpy as np
 import tensorflow as tf
 
-from examples.music_net import dataset as dataset_mod
+from vae_seq.examples.music_net import dataset as dataset_mod
 
 
 class DatasetTest(tf.test.TestCase):
@@ -17,7 +17,7 @@ class DatasetTest(tf.test.TestCase):
         sequence_size = 4
         dataset = dataset_mod.dataset_from_sequences(
             sequences, batch_size, obs_size, sequence_size)
-        iterator = tf.contrib.data.Iterator.from_dataset(dataset)
+        iterator = dataset.make_initializable_iterator()
         batch = iterator.get_next()
 
         def _check_sequence(sequence, start, end):

@@ -2,9 +2,9 @@
 
 import tensorflow as tf
 
-from examples.text import dataset as dataset_mod
-from examples.text import hparams as hparams_mod
-from examples.text import model
+from vae_seq.examples.text import dataset as dataset_mod
+from vae_seq.examples.text import hparams as hparams_mod
+from vae_seq.examples.text import model
 
 flags = tf.app.flags
 flags.DEFINE_string("train_corpus", None,
@@ -28,5 +28,10 @@ def main(argv):
     model.generate(hparams, id_to_char, FLAGS.log_dir, FLAGS.samples)
 
 
-if __name__ == "__main__":
+def entry_point():
+    """Entry point for setuptools."""
     tf.app.run(main)
+
+
+if __name__ == "__main__":
+    entry_point()

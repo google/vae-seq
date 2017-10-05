@@ -114,7 +114,7 @@ def heterogeneous_dynamic_rnn(
             dtype,
             size=input_length,
             element_shape=tf.TensorShape([None]).concatenate(out_size))
-        for dtype, out_size in zip(flat_dtypes, flat_output_size)[1:]
+        for dtype, out_size in zip(flat_dtypes[1:], flat_output_size[1:])
     ]
     aux_state = (0, aux_output_tas, initial_state)
 
@@ -151,7 +151,7 @@ def heterogeneous_dynamic_rnn(
 
 def transpose_time_batch(tensor):
     """Transposes the first two dimensions of a Tensor."""
-    perm = range(tensor.get_shape().with_rank_at_least(2).ndims)
+    perm = list(range(tensor.get_shape().with_rank_at_least(2).ndims))
     perm[0], perm[1] = 1, 0
     return tf.transpose(tensor, perm=perm)
 

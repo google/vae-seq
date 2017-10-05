@@ -75,7 +75,7 @@ def train(hparams, log_dir, num_steps):
         checkpoint_dir=log_dir,
         is_chief=True,
         hooks=[logging_hook, display_hook]) as sess:
-        for _ in xrange(num_steps):
+        for _ in six.range(num_steps):
             if sess.should_stop():
                 break
             sess.run(train_op)

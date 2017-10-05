@@ -1,5 +1,6 @@
 """Functions to build up training and generation graphs."""
 
+import six
 import tensorflow as tf
 
 from vae_seq import agent as agent_mod
@@ -65,7 +66,7 @@ def observations_to_strings(observed, id_to_char):
 
 def observations(dataset, char_to_id):
     """Returns a sequence of observations (IDs) from the dataset."""
-    iterator = tf.contrib.data.Iterator.from_dataset(dataset)
+    iterator = dataset.make_initializable_iterator()
     tf.add_to_collection(tf.GraphKeys.LOCAL_INIT_OP, iterator.initializer)
     chars = iterator.get_next()
     return char_to_id.lookup(chars)
@@ -108,7 +109,7 @@ def train(hparams, dataset, char_to_id, id_to_char, log_dir, num_steps,
                                            checkpoint_dir=log_dir,
                                            is_chief=True,
                                            hooks=hooks) as sess:
-        for i in xrange(num_steps):
+        for i in six.range(num_steps):
             if sess.should_stop():
                 break
             ops = [train_op]
@@ -129,7 +130,7 @@ def evaluate(hparams, dataset, char_to_id, log_dir, num_steps):
         session_creator=tf.train.ChiefSessionCreator(
             scaffold=make_scaffold(),
             checkpoint_dir=log_dir)) as sess:
-        for _ in xrange(num_steps):
+        for _ in six.range(num_steps):
             sess.run(tf.get_collection("metric_updates"))
 
 

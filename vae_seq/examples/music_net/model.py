@@ -49,7 +49,7 @@ def flatten_samples(hparams, sequences):
 
 def train(hparams, dataset, log_dir, num_steps):
     """Trains/continues training a VAE and saves it in log_dir."""
-    iterator = tf.contrib.data.Iterator.from_dataset(dataset)
+    iterator = dataset.make_initializable_iterator()
     observed, offsets = iterator.get_next()
     vae = make_vae(hparams)
     train_op, debug_tensors = train_graph(hparams, vae, observed, offsets)
@@ -80,7 +80,7 @@ def train(hparams, dataset, log_dir, num_steps):
         is_chief=True,
         scaffold=scaffold,
         hooks=[logging_hook, display_hook]) as sess:
-        for _ in xrange(num_steps):
+        for _ in six.range(num_steps):
             if sess.should_stop():
                 break
             sess.run(train_op)

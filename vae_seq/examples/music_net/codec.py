@@ -32,8 +32,8 @@ class AudioObsEncoder(snt.AbstractModule):
             (channels, kernel, pool_size, strides) = conv_layer_params
             layers += [snt.Conv1D(channels, kernel_shape=kernel),
                        functools.partial(tf.layers.max_pooling1d,
-                                         pool_size=pool_size,
-                                         strides=strides)]
+                                         pool_size=(pool_size,),
+                                         strides=(strides,))]
         layers += [snt.BatchFlatten(), self._mlp]
         return snt.Sequential(layers)(samples)
 
@@ -88,7 +88,7 @@ class AudioObsDecoder(dist_module.DistModule):
             deconv = snt.Conv1DTranspose(channels,
                                          output_shape=output_width,
                                          kernel_shape=kernel_shape,
-                                         stride=stride)
+                                         stride=(stride,))
             layers.append(deconv)
         params = snt.Sequential(layers)(inputs)
         loc, unproj_scale = tf.unstack(params, axis=2)

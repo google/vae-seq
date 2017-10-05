@@ -4,9 +4,9 @@ import numpy as np
 import tensorflow as tf
 from vae_seq import util
 
-from examples.music_net import agent as agent_mod
-from examples.music_net import codec
-from examples.music_net import hparams as hparams_mod
+from vae_seq.examples.music_net import agent as agent_mod
+from vae_seq.examples.music_net import codec
+from vae_seq.examples.music_net import hparams as hparams_mod
 
 
 def _make_hparams():

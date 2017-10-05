@@ -5,7 +5,7 @@ import io
 import os.path
 import tensorflow as tf
 
-from examples.text import dataset as dataset_mod
+from vae_seq.examples.text import dataset as dataset_mod
 
 
 def _write_corpus(text):
@@ -33,6 +33,7 @@ class DatasetTest(tf.test.TestCase):
             self.assertTrue(0 <= ids[1] < vocab_size)
             self.assertTrue(0 <= ids[2] < vocab_size)
             self.assertTrue(0 <= ids[3] < vocab_size)
+            chars = [tf.compat.as_text(c) for c in chars]
             self.assertTrue(chars[0] in text)
             self.assertEqual(chars[1], " ")
 
@@ -49,20 +50,20 @@ class DatasetTest(tf.test.TestCase):
             sess.run(tf.tables_initializer())
             ids, chars = sess.run([ids, chars])
             self.assertAllEqual(ids, [1, 0, 1, 1])
-            self.assertAllEqual(chars, ["l", " "])
+            self.assertAllEqual(chars, [b"l", b" "])
 
     def test_characters(self):
         tf.set_random_seed(1)
         text = u"hello\nこんにちは"
         dataset = dataset_mod.characters(_write_corpus(text), 2, 6)
-        iterator = tf.contrib.data.Iterator.from_dataset(dataset)
+        iterator = dataset.make_initializable_iterator()
         batch = iterator.get_next()
         with self.test_session() as sess:
             sess.run(iterator.initializer)
             self.assertAllEqual(
                 sess.run(batch),
                 [[tf.compat.as_bytes(c) for c in u"こんにちは\n"],
-                 [tf.compat.as_bytes(c) for c in "hello\n"]])
+                 [tf.compat.as_bytes(c) for c in u"hello\n"]])
 
 
 if __name__ == "__main__":

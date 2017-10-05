@@ -9,9 +9,9 @@ import os.path
 import tensorflow as tf
 from vae_seq import util
 
-from examples.music_net import dataset as dataset_mod
-from examples.music_net import hparams as hparams_mod
-from examples.music_net import model
+from vae_seq.examples.music_net import dataset as dataset_mod
+from vae_seq.examples.music_net import hparams as hparams_mod
+from vae_seq.examples.music_net import model
 
 flags = tf.app.flags
 flags.DEFINE_string(
