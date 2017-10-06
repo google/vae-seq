@@ -5,7 +5,7 @@ import numpy as np
 import pretty_midi
 import tensorflow as tf
 
-from vae_seq.examples.midi import dataset as dataset_mod
+from vaeseq.examples.midi import dataset as dataset_mod
 
 
 def _write_midi(note):

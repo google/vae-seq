@@ -4,3 +4,4 @@ bazel-*
 build/
 dist/
 *.egg*
+*#*

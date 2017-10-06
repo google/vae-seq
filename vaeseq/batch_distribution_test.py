@@ -3,7 +3,7 @@
 import numpy as np
 import tensorflow as tf
 
-from vae_seq import batch_distribution
+from vaeseq import batch_distribution
 
 
 class BatchDistributionTest(tf.test.TestCase):

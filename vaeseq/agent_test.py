@@ -2,9 +2,9 @@
 
 import tensorflow as tf
 
-from vae_seq import agent as agent_mod
-from vae_seq import hparams as hparams_mod
-from vae_seq import codec
+from vaeseq import agent as agent_mod
+from vaeseq import hparams as hparams_mod
+from vaeseq import codec
 
 
 class TestEnvironment(agent_mod.Environment):

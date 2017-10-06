@@ -5,7 +5,7 @@ import io
 import os.path
 import tensorflow as tf
 
-from vae_seq.examples.text import dataset as dataset_mod
+from vaeseq.examples.text import dataset as dataset_mod
 
 
 def _write_corpus(text):

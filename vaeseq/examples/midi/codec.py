@@ -2,10 +2,10 @@
 
 import tensorflow as tf
 
-from vae_seq import batch_distribution
-from vae_seq import codec
-from vae_seq import dist_module
-from vae_seq import util
+from vaeseq import batch_distribution
+from vaeseq import codec
+from vaeseq import dist_module
+from vaeseq import util
 
 
 ObsEncoder = codec.MLPObsEncoder

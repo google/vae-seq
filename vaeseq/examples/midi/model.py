@@ -9,10 +9,10 @@ import numpy as np
 import scipy.io.wavfile
 import tensorflow as tf
 
-from vae_seq import agent as agent_mod
-from vae_seq import train as train_mod
-from vae_seq import util
-from vae_seq import vae as vae_mod
+from vaeseq import agent as agent_mod
+from vaeseq import train as train_mod
+from vaeseq import util
+from vaeseq import vae as vae_mod
 
 from . import codec
 

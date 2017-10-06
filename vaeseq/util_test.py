@@ -3,8 +3,8 @@
 import numpy as np
 import tensorflow as tf
 
-from vae_seq import hparams as hparams_mod
-from vae_seq import util
+from vaeseq import hparams as hparams_mod
+from vaeseq import util
 
 
 def _add_sub_core():

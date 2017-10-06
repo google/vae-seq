@@ -5,7 +5,7 @@ import unittest
 def tests():
     """Used by test_suite below."""
     return unittest.TestLoader().discover(
-        "vae_seq/", "*_test.py", top_level_dir=".")
+        "vaeseq/", "*_test.py", top_level_dir=".")
 
 
 setup(
@@ -27,14 +27,14 @@ setup(
     entry_points={
         "console_scripts": [
             # examples/text
-            "vaeseq-text-train = vae_seq.examples.text.train:entry_point",
-            "vaeseq-text-generate = vae_seq.examples.text.generate:entry_point",
-            "vaeseq-text-eval = vae_seq.examples.text.evaluate:entry_point",
+            "vaeseq-text-train = vaeseq.examples.text.train:entry_point",
+            "vaeseq-text-generate = vaeseq.examples.text.generate:entry_point",
+            "vaeseq-text-eval = vaeseq.examples.text.evaluate:entry_point",
 
             # examples/midi
-            "vaeseq-midi-train = vae_seq.examples.midi.train:entry_point",
-            "vaeseq-midi-generate = vae_seq.examples.midi.generate:entry_point",
-            "vaeseq-midi-eval = vae_seq.examples.midi.evaluate:entry_point",
+            "vaeseq-midi-train = vaeseq.examples.midi.train:entry_point",
+            "vaeseq-midi-generate = vaeseq.examples.midi.generate:entry_point",
+            "vaeseq-midi-eval = vaeseq.examples.midi.evaluate:entry_point",
         ],
     },
     test_suite="setup.tests",

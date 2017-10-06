@@ -1,11 +1,11 @@
 """Tests for training and generating graphs."""
 
 import tensorflow as tf
-from vae_seq import util
+from vaeseq import util
 
-from vae_seq.examples.midi import dataset as dataset_mod
-from vae_seq.examples.midi import hparams as hparams_mod
-from vae_seq.examples.midi import model
+from vaeseq.examples.midi import dataset as dataset_mod
+from vaeseq.examples.midi import hparams as hparams_mod
+from vaeseq.examples.midi import model
 
 
 def _hparams(vae_type):

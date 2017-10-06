@@ -3,8 +3,8 @@
 import tensorflow as tf
 import sonnet as snt
 
-from vae_seq import dist_module
-from vae_seq import util
+from vaeseq import dist_module
+from vaeseq import util
 
 
 class ObsEncoder(snt.AbstractModule):

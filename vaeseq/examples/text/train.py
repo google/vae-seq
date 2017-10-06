@@ -1,11 +1,11 @@
 """Train a model over text data, character-by-character."""
 
 import tensorflow as tf
-from vae_seq import util
+from vaeseq import util
 
-from vae_seq.examples.text import dataset as dataset_mod
-from vae_seq.examples.text import hparams as hparams_mod
-from vae_seq.examples.text import model
+from vaeseq.examples.text import dataset as dataset_mod
+from vaeseq.examples.text import hparams as hparams_mod
+from vaeseq.examples.text import model
 
 flags = tf.app.flags
 flags.DEFINE_string("train_corpus", None, "Location of training text.")

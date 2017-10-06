@@ -1,6 +1,6 @@
 """Hyperparameters for this example."""
 
-from vae_seq import hparams as hparams_mod
+from vaeseq import hparams as hparams_mod
 
 _DEFAULTS = dict(
     latent_size=16,

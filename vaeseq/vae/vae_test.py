@@ -2,11 +2,11 @@
 
 import tensorflow as tf
 
-from vae_seq import agent as agent_mod
-from vae_seq import hparams as hparams_mod
-from vae_seq import codec
-from vae_seq import util
-from vae_seq import vae as vae_mod
+from vaeseq import agent as agent_mod
+from vaeseq import hparams as hparams_mod
+from vaeseq import codec
+from vaeseq import util
+from vaeseq import vae as vae_mod
 
 
 def _build_vae(hparams):

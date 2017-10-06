@@ -4,9 +4,9 @@ py_library(
     name = "base",
     srcs = ["base.py"],
     deps = [
-        "//vae_seq:eval_core",
-        "//vae_seq:gen_core",
-        "//vae_seq:util",
+        "//vaeseq:eval_core",
+        "//vaeseq:gen_core",
+        "//vaeseq:util",
     ],
 )
 
@@ -15,9 +15,9 @@ py_library(
     srcs = ["independent_sequence.py"],
     deps = [
         ":base",
-        "//vae_seq:dist_module",
-        "//vae_seq:latent",
-        "//vae_seq:util",
+        "//vaeseq:dist_module",
+        "//vaeseq:latent",
+        "//vaeseq:util",
     ],
 )
 
@@ -26,8 +26,8 @@ py_library(
     srcs = ["rnn.py"],
     deps = [
         ":base",
-        "//vae_seq:dist_module",
-        "//vae_seq:util",
+        "//vaeseq:dist_module",
+        "//vaeseq:util",
     ],
 )
 
@@ -36,9 +36,9 @@ py_library(
     srcs = ["srnn.py"],
     deps = [
         ":base",
-        "//vae_seq:dist_module",
-        "//vae_seq:latent",
-        "//vae_seq:util",
+        "//vaeseq:dist_module",
+        "//vaeseq:latent",
+        "//vaeseq:util",
     ],
 )
 
@@ -57,9 +57,9 @@ py_test(
     srcs = ["vae_test.py"],
     deps = [
         ":vae",
-        "//vae_seq:agent",
-        "//vae_seq:codec",
-        "//vae_seq:hparams",
-        "//vae_seq:util",
+        "//vaeseq:agent",
+        "//vaeseq:codec",
+        "//vaeseq:hparams",
+        "//vaeseq:util",
     ],
 )

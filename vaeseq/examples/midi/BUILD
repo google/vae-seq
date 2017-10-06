@@ -24,8 +24,10 @@ py_library(
     name = "codec",
     srcs = ["codec.py"],
     deps = [
-        "//vae_seq:dist_module",
-        "//vae_seq:util",
+        "//vaeseq:batch_distribution",
+        "//vaeseq:codec",
+        "//vaeseq:dist_module",
+        "//vaeseq:util",
     ],
 )
 
@@ -33,7 +35,7 @@ py_library(
     name = "hparams",
     srcs = ["hparams.py"],
     deps = [
-        "//vae_seq:hparams",
+        "//vaeseq:hparams",
     ]
 )
 
@@ -42,10 +44,10 @@ py_library(
     srcs = ["model.py"],
     deps = [
         ":codec",
-        "//vae_seq/vae",
-        "//vae_seq:agent",
-        "//vae_seq:train",
-        "//vae_seq:util",
+        "//vaeseq/vae",
+        "//vaeseq:agent",
+        "//vaeseq:train",
+        "//vaeseq:util",
     ],
 )
 
@@ -56,7 +58,7 @@ py_test(
         ":dataset",
         ":hparams",
         ":model",
-        "//vae_seq:util",
+        "//vaeseq:util",
     ],
 )
 
@@ -67,7 +69,7 @@ py_binary(
         ":dataset",
         ":hparams",
         ":model",
-        "//vae_seq:util",
+        "//vaeseq:util",
     ],
 )
 
@@ -75,7 +77,6 @@ py_binary(
     name = "generate",
     srcs = ["generate.py"],
     deps = [
-        ":dataset",
         ":hparams",
         ":model",
     ],
@@ -88,6 +89,6 @@ py_binary(
         ":dataset",
         ":hparams",
         ":model",
-        "//vae_seq:util",
+        "//vaeseq:util",
     ],
 )
