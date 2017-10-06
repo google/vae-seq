@@ -82,33 +82,6 @@ class ObsDist(dist_module.DistCore):
         return self._obs_decoder(d_out), d_state
 
 
-class NoEventsDist(distributions.Distribution):
-    """A partial implementation of dirac(null-event)."""
-
-    def __init__(self, batch_shape, dtype=tf.float32, name=None):
-        name = name or "NoEventsDist"
-        super(NoEventsDist, self).__init__(
-            dtype=dtype,
-            reparameterization_type=distributions.NOT_REPARAMETERIZED,
-            validate_args=False,
-            allow_nan_stats=False,
-            name=name)
-        with tf.name_scope(name, values=[batch_shape]):
-            self._batch_shape_param = tf.convert_to_tensor(
-                batch_shape, name="batch_shape", dtype=tf.int32)
-
-    def _batch_shape_tensor(self):
-        return self._batch_shape_param
-
-    def _batch_shape(self):
-        return tf.TensorShape(
-            [None] * self._batch_shape_param.get_shape().ndims)
-
-    def _sample_n(self, n, seed=None):
-        shape = tf.concat([[n], self.batch_shape_tensor(), [0]], axis=0)
-        return tf.zeros(shape)
-
-
 class NoLatents(dist_module.DistCore):
     """DistCore that samples an empty latent state."""
 
@@ -130,7 +103,9 @@ class NoLatents(dist_module.DistCore):
 
     def dist(self, params, name=None):
         del params  # No parameters needed.
-        return NoEventsDist([util.batch_size(self._hparams)])
+        null_events = tf.zeros([util.batch_size(self._hparams), 0],
+                               dtype=self.event_dtype)
+        return tf.contrib.distributions.VectorDeterministic(null_events)
 
     def _next_state(self, state_arg, event=None):
         del state_arg  # No state needed.
