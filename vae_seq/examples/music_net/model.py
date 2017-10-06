@@ -1,5 +1,8 @@
 """Functions to build up training and generation graphs."""
 
+from __future__ import print_function
+from builtins import range
+
 import tensorflow as tf
 
 from vae_seq import train as train_mod
@@ -80,7 +83,7 @@ def train(hparams, dataset, log_dir, num_steps):
         is_chief=True,
         scaffold=scaffold,
         hooks=[logging_hook, display_hook]) as sess:
-        for _ in six.range(num_steps):
+        for _ in range(num_steps):
             if sess.should_stop():
                 break
             sess.run(train_op)

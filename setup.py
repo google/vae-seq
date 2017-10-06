@@ -17,6 +17,7 @@ setup(
     long_description=open("README.md").read(),
     packages=find_packages(),
     install_requires=[
+        "future>=0.16.0",
         "numpy>=1.12.0",
         "tensorflow>=1.3.0",
         "dm-sonnet>=1.10",
@@ -24,8 +25,9 @@ setup(
     ],
     entry_points={
         "console_scripts": [
+            # examples/text
             "vaeseq-text-train = vae_seq.examples.text.train:entry_point",
-            "vaeseq-text-gen = vae_seq.examples.text.generate:entry_point",
+            "vaeseq-text-generate = vae_seq.examples.text.generate:entry_point",
             "vaeseq-text-eval = vae_seq.examples.text.evaluate:entry_point",
         ],
     },

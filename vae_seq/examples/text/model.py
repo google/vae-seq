@@ -1,6 +1,8 @@
 """Functions to build up training and generation graphs."""
 
-import six
+from __future__ import print_function
+from builtins import range
+
 import tensorflow as tf
 
 from vae_seq import agent as agent_mod
@@ -109,7 +111,7 @@ def train(hparams, dataset, char_to_id, id_to_char, log_dir, num_steps,
                                            checkpoint_dir=log_dir,
                                            is_chief=True,
                                            hooks=hooks) as sess:
-        for i in six.range(num_steps):
+        for i in range(num_steps):
             if sess.should_stop():
                 break
             ops = [train_op]
@@ -130,7 +132,7 @@ def evaluate(hparams, dataset, char_to_id, log_dir, num_steps):
         session_creator=tf.train.ChiefSessionCreator(
             scaffold=make_scaffold(),
             checkpoint_dir=log_dir)) as sess:
-        for _ in six.range(num_steps):
+        for _ in range(num_steps):
             sess.run(tf.get_collection("metric_updates"))
 
 

@@ -1,5 +1,7 @@
 """Training subgraph for a VAE."""
 
+from __future__ import print_function
+
 import sonnet as snt
 import tensorflow as tf
 

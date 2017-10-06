@@ -45,7 +45,7 @@ class DatasetTest(tf.test.TestCase):
                  file1=([1, 1, 2, 2], None),
                  file2=([3, 3, 4, 4, 5, 5], None),
                  file3=([6, 6, 7, 7, 8, 8, 9, 9], None))
-        rate = dataset_mod.MUSICNET_SAMPLING_RATE / 2
+        rate = dataset_mod.MUSICNET_SAMPLING_RATE // 2
         train_seqs = dataset_mod.load_musicnet_sequences(
             temp_path, train_frac=0.8, rate=rate, training=True)
         valid_seqs = dataset_mod.load_musicnet_sequences(
@@ -61,7 +61,7 @@ class DatasetTest(tf.test.TestCase):
         temp_path = os.path.join(tf.test.get_temp_dir(), "fake_data.npz")
         cache_path = os.path.join(tf.test.get_temp_dir(), "fake_data.cache.npz")
         np.savez(temp_path, file1=([1, 1, 2, 2], None))
-        rate = dataset_mod.MUSICNET_SAMPLING_RATE / 2
+        rate = dataset_mod.MUSICNET_SAMPLING_RATE // 2
         _unused_seqs = dataset_mod.load_musicnet_sequences(
             temp_path, train_frac=1.0, rate=rate, cache_path=cache_path)
         self.assertAllClose(np.load(cache_path)["file1"][0], [1.25, 1.75])
