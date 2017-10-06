@@ -8,6 +8,7 @@ test_suite(
           "batch_distribution_test",
           "util_test",
           "//vae_seq/examples/music_net:tests",
+          "//vae_seq/examples/midi:tests",
           "//vae_seq/examples/text:tests",
           "//vae_seq/examples/toy_game:tests",
           "//vae_seq/vae:vae_test",

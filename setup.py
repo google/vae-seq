@@ -9,7 +9,7 @@ def tests():
 
 
 setup(
-    name="vae_seq",
+    name="vae-seq",
     author="Yury Sulsky",
     author_email="yury.sulsky@gmail.com",
     version="0.1",
@@ -21,6 +21,7 @@ setup(
         "numpy>=1.12.0",
         "tensorflow>=1.3.0",
         "dm-sonnet>=1.10",
+        "pretty-midi>=0.2.8",
         "scipy>=0.16.0",
     ],
     entry_points={
@@ -29,6 +30,11 @@ setup(
             "vaeseq-text-train = vae_seq.examples.text.train:entry_point",
             "vaeseq-text-generate = vae_seq.examples.text.generate:entry_point",
             "vaeseq-text-eval = vae_seq.examples.text.evaluate:entry_point",
+
+            # examples/midi
+            "vaeseq-midi-train = vae_seq.examples.midi.train:entry_point",
+            "vaeseq-midi-generate = vae_seq.examples.midi.generate:entry_point",
+            "vaeseq-midi-eval = vae_seq.examples.midi.evaluate:entry_point",
         ],
     },
     test_suite="setup.tests",
