@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 
-from vaeseq import batch_distribution
+from vaeseq import batch_dist
 from vaeseq import codec
 from vaeseq import dist_module
 from vaeseq import util
@@ -29,7 +29,7 @@ class ObsDecoder(dist_module.DistModule):
             logits=logits,
             dtype=self.event_dtype,
             name=name_prefix + "_note_dist")
-        return batch_distribution.BatchDistribution(
+        return batch_dist.BatchDistribution(
             note_dist,
             ndims=1,
             name=name_prefix+"_scale_dist")

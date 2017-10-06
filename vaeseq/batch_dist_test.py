@@ -3,22 +3,22 @@
 import numpy as np
 import tensorflow as tf
 
-from vaeseq import batch_distribution
+from vaeseq import batch_dist
 
 
 class BatchDistributionTest(tf.test.TestCase):
 
     def test_sample(self):
         dist = tf.distributions.Bernoulli(logits=tf.zeros((4, 5, 6)))
-        batch_dist = batch_distribution.BatchDistribution(dist)
+        batch_dist1 = batch_dist.BatchDistribution(dist)
         with self.test_session() as sess:
             sess.run(tf.assert_equal(dist.sample(seed=123),
-                                     batch_dist.sample(seed=123)))
+                                     batch_dist1.sample(seed=123)))
 
     def test_log_prob(self):
         dist = tf.distributions.Bernoulli(logits=tf.zeros((4, 5, 6)))
-        batch_dist1 = batch_distribution.BatchDistribution(dist)
-        batch_dist2 = batch_distribution.BatchDistribution(dist, ndims=2)
+        batch_dist1 = batch_dist.BatchDistribution(dist)
+        batch_dist2 = batch_dist.BatchDistribution(dist, ndims=2)
         event = tf.zeros((4, 5, 6))
         with self.test_session() as sess:
             self.assertAllClose(sess.run(batch_dist1.log_prob(event)),
@@ -28,8 +28,8 @@ class BatchDistributionTest(tf.test.TestCase):
 
     def test_prob(self):
         dist = tf.distributions.Bernoulli(probs=0.5 * tf.ones((4, 5, 6)))
-        batch_dist1 = batch_distribution.BatchDistribution(dist)
-        batch_dist2 = batch_distribution.BatchDistribution(dist, ndims=2)
+        batch_dist1 = batch_dist.BatchDistribution(dist)
+        batch_dist2 = batch_dist.BatchDistribution(dist, ndims=2)
         event = tf.zeros((4, 5, 6))
         with self.test_session() as sess:
             self.assertAllClose(sess.run(batch_dist1.prob(event)),

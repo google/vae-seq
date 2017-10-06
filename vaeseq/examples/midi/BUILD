@@ -24,7 +24,7 @@ py_library(
     name = "codec",
     srcs = ["codec.py"],
     deps = [
-        "//vaeseq:batch_distribution",
+        "//vaeseq:batch_dist",
         "//vaeseq:codec",
         "//vaeseq:dist_module",
         "//vaeseq:util",

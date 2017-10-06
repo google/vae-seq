@@ -5,7 +5,7 @@ test_suite(
     name = "tests",
     tests = [
           "agent_test",
-          "batch_distribution_test",
+          "batch_dist_test",
           "util_test",
           "//vaeseq/examples/midi:tests",
           "//vaeseq/examples/text:tests",
@@ -19,15 +19,15 @@ py_library(
 )
 
 py_library(
-    name = "batch_distribution",
-    srcs = ["batch_distribution.py"],
+    name = "batch_dist",
+    srcs = ["batch_dist.py"],
 )
 
 py_test(
-    name = "batch_distribution_test",
-    srcs = ["batch_distribution_test.py"],
+    name = "batch_dist_test",
+    srcs = ["batch_dist_test.py"],
     deps = [
-         ":batch_distribution",
+         ":batch_dist",
     ],
 )
 
