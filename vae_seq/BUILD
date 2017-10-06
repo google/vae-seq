@@ -5,6 +5,7 @@ test_suite(
     name = "tests",
     tests = [
           "agent_test",
+          "batch_distribution_test",
           "util_test",
           "//vae_seq/examples/music_net:tests",
           "//vae_seq/examples/text:tests",
@@ -16,6 +17,19 @@ test_suite(
 py_library(
     name = "dist_module",
     srcs = ["dist_module.py"],
+)
+
+py_library(
+    name = "batch_distribution",
+    srcs = ["batch_distribution.py"],
+)
+
+py_test(
+    name = "batch_distribution_test",
+    srcs = ["batch_distribution_test.py"],
+    deps = [
+         ":batch_distribution",
+    ],
 )
 
 py_library(
