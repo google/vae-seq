@@ -26,7 +26,6 @@ py_library(
     deps = [
         "//vaeseq:batch_dist",
         "//vaeseq:codec",
-        "//vaeseq:dist_module",
         "//vaeseq:util",
     ],
 )

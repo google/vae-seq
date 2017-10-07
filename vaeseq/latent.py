@@ -19,6 +19,11 @@ class LatentDecoder(dist_module.DistModule):
         """The data type of the latent variables."""
         return tf.float32
 
+    @property
+    def event_size(self):
+        """The size of the latent variables."""
+        return tf.TensorShape([self._hparams.latent_size])
+
     def dist(self, params, name=None):
         loc, scale_diag = params
         name = name or self.module_name + "_dist"

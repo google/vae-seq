@@ -4,38 +4,34 @@ import tensorflow as tf
 
 from vaeseq import batch_dist
 from vaeseq import codec
-from vaeseq import dist_module
 from vaeseq import util
 
 
 ObsEncoder = codec.MLPObsEncoder
 
 
-class ObsDecoder(dist_module.DistModule):
-    """Inputs -> Bernoulli activations."""
+class ObsDecoder(codec.MLPObsDecoderBase):
+    """Inputs -> independent Bernoulli activations."""
 
     def __init__(self, hparams, name=None):
-        super(ObsDecoder, self).__init__(name=name)
-        self._hparams = hparams
+        super(ObsDecoder, self).__init__(hparams, 128, name=name)
 
     @property
     def event_dtype(self):
         return tf.bool
 
-    def dist(self, logits, name=None):
-        """Constructs a Distribution from the output of the module."""
+    @property
+    def event_size(self):
+        return tf.TensorShape([128])
+
+    def dist(self, params, name=None):
+        """Constructs the output Distribution."""
         name_prefix = name or self.module_name
         note_dist = tf.distributions.Bernoulli(
-            logits=logits,
+            logits=params,
             dtype=self.event_dtype,
             name=name_prefix + "_note_dist")
         return batch_dist.BatchDistribution(
             note_dist,
             ndims=1,
             name=name_prefix+"_scale_dist")
-
-    def _build(self, *inputs):
-        hparams = self._hparams
-        layers = hparams.obs_decoder_fc_hidden_layers + hparams.obs_shape
-        mlp = util.make_mlp(hparams, layers)
-        return mlp(util.concat_features(inputs))

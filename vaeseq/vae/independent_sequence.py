@@ -87,7 +87,7 @@ class ObsDist(dist_module.DistCore):
 
     @property
     def event_size(self):
-        return tf.TensorShape(self._hparams.obs_shape)
+        return self._obs_decoder.event_size
 
     @property
     def event_dtype(self):

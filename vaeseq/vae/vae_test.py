@@ -9,18 +9,19 @@ from vaeseq import util
 from vaeseq import vae as vae_mod
 
 
+
 def _build_vae(hparams):
     """Constructs a VAE."""
     obs_encoder = codec.MLPObsEncoder(hparams)
-    obs_decoder = codec.OneHotObsDecoder(hparams)
+    obs_decoder = codec.BernoulliMLPObsDecoder(hparams)
     agent = agent_mod.EncodeObsAgent(obs_encoder)
     return vae_mod.make(hparams, agent, obs_encoder, obs_decoder)
 
 
 def _observed(hparams):
     """Test observations."""
-    return tf.zeros([util.batch_size(hparams), util.sequence_size(hparams)] +
-                    hparams.obs_shape, dtype=tf.int32)
+    return tf.zeros([util.batch_size(hparams), util.sequence_size(hparams)],
+                    dtype=tf.int32)
 
 
 def _inf_tensors(hparams, vae):

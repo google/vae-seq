@@ -48,10 +48,8 @@ class SRNN(base.VAEBase):
         self._e_core = util.make_rnn(hparams, name="e_core")
         self._latent_p = latent_mod.LatentDecoder(hparams, name="latent_p")
         self._latent_q = latent_mod.LatentDecoder(hparams, name="latent_q")
-        self._latent_prior_distcore = LatentPrior(
-            hparams, self._d_core, self._latent_p)
-        self._observed_distcore = ObsDist(
-            hparams, self._d_core, self._obs_decoder)
+        self._latent_prior_distcore = LatentPrior(self._d_core, self._latent_p)
+        self._observed_distcore = ObsDist(self._d_core, self._obs_decoder)
 
     def infer_latents(self, contexts, observed):
         hparams = self._hparams
@@ -98,9 +96,8 @@ class SRNN(base.VAEBase):
 class ObsDist(dist_module.DistCore):
     """DistCore for producing p(observation | context, latent)."""
 
-    def __init__(self, hparams, d_core, obs_decoder, name=None):
+    def __init__(self, d_core, obs_decoder, name=None):
         super(ObsDist, self).__init__(name=name)
-        self._hparams = hparams
         self._d_core = d_core
         self._obs_decoder = obs_decoder
 
@@ -110,7 +107,7 @@ class ObsDist(dist_module.DistCore):
 
     @property
     def event_size(self):
-        return tf.TensorShape(self._hparams.obs_shape)
+        return self._obs_decoder.event_size
 
     @property
     def event_dtype(self):
@@ -131,20 +128,19 @@ class ObsDist(dist_module.DistCore):
 class LatentPrior(dist_module.DistCore):
     """DistCore that produces Normal latent variables."""
 
-    def __init__(self, hparams, d_core, latent_p, name=None):
+    def __init__(self, d_core, latent_p, name=None):
         super(LatentPrior, self).__init__(name=name)
-        self._hparams = hparams
         self._d_core = d_core
         self._latent_p = latent_p
 
     @property
     def state_size(self):
-        return (tf.TensorShape(self._hparams.latent_size),  # prev_latent
-                self._d_core.state_size,)                   # d state
+        return (self._latent_p.event_size,  # prev_latent
+                self._d_core.state_size,)   # d state
 
     @property
     def event_size(self):
-        return tf.TensorShape(self._hparams.latent_size)
+        return self._latent_p.event_size
 
     @property
     def event_dtype(self):

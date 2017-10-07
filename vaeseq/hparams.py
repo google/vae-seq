@@ -3,9 +3,6 @@
 import tensorflow as tf
 
 _DEFAULTS = dict(
-    # Shape of observed events, set in environment-specific code.
-    obs_shape=None,
-
     # Number of latent units per time step
     latent_size=4,
 

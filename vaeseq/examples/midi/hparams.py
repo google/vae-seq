@@ -17,6 +17,4 @@ def make_hparams(flag_value=None, **kwargs):
     init = dict(_DEFAULTS)
     init.update(kwargs)
     ret = hparams_mod.make_hparams(flag_value=flag_value, **init)
-    # Observations are individual note levels, 128 of them per tick.
-    ret.obs_shape = [128]
     return ret

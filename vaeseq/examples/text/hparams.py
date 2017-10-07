@@ -19,5 +19,4 @@ def make_hparams(flag_value=None, **kwargs):
     init = dict(_DEFAULTS)
     init.update(kwargs)
     ret = hparams_mod.make_hparams(flag_value=flag_value, **init)
-    ret.obs_shape = []
     return ret

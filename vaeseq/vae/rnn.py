@@ -36,8 +36,7 @@ class RNN(base.VAEBase):
         hparams = self._hparams
         self._d_core = util.make_rnn(hparams, name="d_core")
         self._latent_prior_distcore = NoLatents(hparams)
-        self._observed_distcore = ObsDist(
-            hparams, self._d_core, self._obs_decoder)
+        self._observed_distcore = ObsDist(self._d_core, self._obs_decoder)
 
     def infer_latents(self, contexts, observed):
         batch_size, length = tf.unstack(tf.shape(observed)[:2])
@@ -51,9 +50,8 @@ class RNN(base.VAEBase):
 class ObsDist(dist_module.DistCore):
     """DistCore for producing p(observation | context, latent)."""
 
-    def __init__(self, hparams, d_core, obs_decoder, name=None):
+    def __init__(self, d_core, obs_decoder, name=None):
         super(ObsDist, self).__init__(name=name)
-        self._hparams = hparams
         self._d_core = d_core
         self._obs_decoder = obs_decoder
 
@@ -63,7 +61,7 @@ class ObsDist(dist_module.DistCore):
 
     @property
     def event_size(self):
-        return tf.TensorShape(self._hparams.obs_shape)
+        return self._obs_decoder.event_size
 
     @property
     def event_dtype(self):

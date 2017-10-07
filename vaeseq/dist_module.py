@@ -14,6 +14,10 @@ class DistModule(snt.AbstractModule):
     def event_dtype(self):
         """Returns the output distribution event dtypes."""
 
+    @abc.abstractproperty
+    def event_size(self):
+        """Returns the output distribution event sizes."""
+
     @abc.abstractmethod
     def dist(self, params, name=None):
         """Constructs a Distribution parameterized by the module output."""
@@ -25,10 +29,6 @@ class DistCore(DistModule):
     @abc.abstractproperty
     def state_size(self):
         """Returns the non-batched sizes of Tensors returned from next_state."""
-
-    @abc.abstractproperty
-    def event_size(self):
-        """Returns the output distribution event sizes."""
 
     @abc.abstractmethod
     def _next_state(self, state_arg, event=None):
