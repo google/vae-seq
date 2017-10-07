@@ -1,5 +1,6 @@
-"""A distribution over (independent) batches of events."""
+"""Distributions over independent sets of events."""
 
+import sonnet as snt
 import tensorflow as tf
 
 
@@ -44,3 +45,81 @@ class BatchDistribution(tf.distributions.Distribution):
     def _prob(self, event):
         probs = self._dist._prob(event)
         return tf.reduce_prod(probs, axis=list(range(-self._ndims, 0)))
+
+
+class GroupDistribution(tf.distributions.Distribution):
+    """Group together several independent distributions.
+
+    Note, the batch shapes of the component distributions must match.
+    """
+
+    def __init__(self, distributions, name=None):
+        parameters = locals()
+        self._dists = distributions
+        self._flat_dists = snt.nest.flatten(distributions)
+        dtype = snt.nest.map(lambda dist: dist.dtype, distributions)
+        r16n_type = tf.distributions.FULLY_REPARAMETERIZED
+        for dist in self._flat_dists:
+            r16n_type = dist.reparameterization_type
+            if r16n_type is not tf.distributions.FULLY_REPARAMETERIZED:
+                break
+        validate_args = all([dist.validate_args for dist in self._flat_dists])
+        allow_nan_stats = all(
+            [dist.allow_nan_stats for dist in self._flat_dists])
+        graph_parents = snt.nest.flatten(
+            [dist._graph_parents for dist in self._flat_dists])
+        name = name or "_".join([dist.name for dist in self._flat_dists])
+        super(GroupDistribution, self).__init__(
+            dtype=dtype,
+            reparameterization_type=r16n_type,
+            validate_args=validate_args,
+            allow_nan_stats=allow_nan_stats,
+            parameters=parameters,
+            graph_parents=graph_parents,
+            name=name)
+
+    @property
+    def batch_shape(self):
+        return snt.nest.map(lambda dist: dist.batch_shape, self._dists)
+
+    def batch_shape_tensor(self, name="batch_shape_tensor"):
+        with self._name_scope(name):
+            return snt.nest.map(
+                lambda dist: dist.batch_shape_tensor(name), self._dists)
+
+    @property
+    def event_shape(self):
+        return snt.nest.map(lambda dist: dist.event_shape, self._dists)
+
+    def event_shape_tensor(self, name="event_shape_tensor"):
+        with self._name_scope(name):
+            return snt.nest.map(
+                lambda dist: dist.event_shape_tensor(name), self._dists)
+
+    def _is_scalar_helper(self, *args, **kwargs):
+        if not self._flat_dists:
+            return True
+        if len(self._flat_dists) == 1:
+            return self._flat_dists[0]._is_scalar_helper(*args, **kwargs)
+        return False
+
+    def sample(self, *args, **kwargs):
+        return snt.nest.map(
+            lambda dist: dist.sample(*args, **kwargs),
+            self._dists)
+
+    def log_prob(self, value, name="log_prob"):
+        flat_values = snt.nest.flatten(value)
+        with self._name_scope(name, values=flat_values):
+            return tf.reduce_sum(
+                [dist.log_prob(val)
+                 for dist, val in zip(self._flat_dists, flat_values)],
+                axis=0)
+
+    def prob(self, value, name="prob"):
+        flat_values = snt.nest.flatten(value)
+        with self._name_scope(name, values=flat_values):
+            return tf.reduce_prod(
+                [dist.prob(val)
+                 for dist, val in zip(self._flat_dists, flat_values)],
+                axis=0)
