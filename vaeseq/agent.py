@@ -83,11 +83,17 @@ class Agent(snt.AbstractModule):
             output_dtypes=self.context_dtype)
         return contexts
 
-    def contexts_and_observations_from_environment(self, env, agent_inputs):
+    def contexts_and_observations_from_environment(self, env, agent_inputs,
+                                                   env_initial_state=None,
+                                                   agent_initial_state=None):
         """Generate contexts and observations from an Environment."""
-        batch_size = tf.shape(agent_inputs)[0]
-        initial_state = (self.initial_state(batch_size),
-                         env.initial_state(batch_size))
+        if env_initial_state is None or agent_initial_state is None:
+            batch_size = tf.shape(agent_inputs)[0]
+            if env_initial_state is None:
+                env_initial_state = env.initial_state(batch_size)
+            if agent_initial_state is None:
+                agent_initial_state = self.initial_state(batch_size)
+        initial_state = (agent_initial_state, env_initial_state)
 
         def _step(agent_input, state):
             """Manipulate the environment and record what happens."""
