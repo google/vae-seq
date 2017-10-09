@@ -20,7 +20,7 @@ class ModelBase(object):
         self._session_params = session_params
         with tf.name_scope("vae"):
             self._vae = self._make_vae()
-        self._trainer = train_mod.TrainOps(self.hparams, self.vae)
+        self._trainer = train_mod.Trainer(self.hparams, self.vae)
 
 
     class SessionParams(object):

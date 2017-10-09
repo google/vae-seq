@@ -6,11 +6,11 @@ import tensorflow as tf
 from . import util
 
 
-class TrainOps(snt.AbstractModule):
+class Trainer(snt.AbstractModule):
     """This module produces a train_op given Agent contexts and observations."""
 
     def __init__(self, hparams, vae, name=None):
-        super(TrainOps, self).__init__(name=name)
+        super(Trainer, self).__init__(name=name)
         self._hparams = hparams
         self._vae = vae
         with self._enter_variable_scope():
@@ -38,21 +38,11 @@ class TrainOps(snt.AbstractModule):
         relaxed_elbo = log_prob - divergence * divergence_strength
         loss = -relaxed_elbo
 
-        # Compute gradients.
-        grads_and_vars = self._optimizer.compute_gradients(loss)
-        for grad, var in grads_and_vars:
-            tag = var.name.replace(":0", "")
-            if grad is None:
-                tf.logging.warn("Missing gradient for %s", tag)
-                continue
-            tf.summary.histogram(tag, var)
-            tf.summary.histogram(tag + "/gradient", grad)
-        train_op = self._optimizer.apply_gradients(
-            grads_and_vars, global_step=tf.train.get_or_create_global_step())
-        if hparams.check_numerics and False:  # FIXME
-            deps = [tf.add_check_numerics_ops(), train_op]
-            with tf.control_dependencies(deps):
-                train_op = tf.no_op()
+        train_op = tf.contrib.training.create_train_op(
+            loss,
+            self._optimizer,
+            summarize_gradients=True,
+            check_numerics=hparams.check_numerics)
 
         debug_tensors = dict(
             log_prob=log_prob,
