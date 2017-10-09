@@ -74,7 +74,7 @@ $ vaeseq-text train --log-dir /tmp/text --train-corpus input.txt \
 
 After training has completed, you can generate text:
 ```shell
-$ vaeseq-text train --log-dir /tmp/text --vocab-corpus input.txt \
+$ vaeseq-text generate --log-dir /tmp/text --vocab-corpus input.txt \
     --length 1000
     --num-samples 20
 ```

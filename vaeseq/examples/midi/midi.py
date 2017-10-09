@@ -16,7 +16,8 @@ def train(flags):
     model = model_mod.Model(
         hparams=hparams_mod.make_hparams(flags.hparams),
         session_params=flags)
-    model.train(flags.train_files, flags.num_steps)
+    model.train(flags.train_files, flags.num_steps,
+                valid_dataset=flags.valid_files)
 
 
 def evaluate(flags):

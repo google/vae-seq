@@ -19,7 +19,8 @@ def train(flags):
         hparams=hparams_mod.make_hparams(flags.hparams),
         session_params=flags,
         vocab_corpus=flags.vocab_corpus or flags.train_corpus)
-    model.train(flags.train_corpus, flags.num_steps)
+    model.train(flags.train_corpus, flags.num_steps,
+                valid_dataset=flags.valid_corpus)
 
 
 def evaluate(flags):
