@@ -45,3 +45,35 @@ def piano_roll_sequences(filenames, batch_size, sequence_size, rate=100):
             .repeat()
             .shuffle(1000)
             .batch(batch_size))
+
+
+def piano_roll_to_midi(piano_roll, sample_rate):
+    """Convert the piano roll to a PrettyMIDI object.
+    See: http://github.com/craffel/examples/reverse_pianoroll.py
+    """
+    midi = pretty_midi.PrettyMIDI()
+    instrument = pretty_midi.Instrument(0)
+    midi.instruments.append(instrument)
+    padded_roll = np.pad(piano_roll, [(1, 1), (0, 0)], mode='constant')
+    changes = np.diff(padded_roll, axis=0)
+    notes = np.full(piano_roll.shape[1], -1, dtype=np.int)
+    for tick, pitch in zip(*np.where(changes)):
+        prev = notes[pitch]
+        if prev == -1:
+            notes[pitch] = tick
+            continue
+        notes[pitch] = -1
+        instrument.notes.append(pretty_midi.Note(
+            velocity=100,
+            pitch=pitch,
+            start=prev / float(sample_rate),
+            end=tick / float(sample_rate)))
+    return midi
+
+
+def write_test_note(path, duration, note):
+    midi = pretty_midi.PrettyMIDI()
+    instrument = pretty_midi.Instrument(0)
+    instrument.notes.append(pretty_midi.Note(100, note, 0.0, duration))
+    midi.instruments.append(instrument)
+    midi.write(path)

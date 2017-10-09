@@ -35,10 +35,10 @@ def make_rnn(hparams, name):
         return snt.DeepRNN(layers, skip_connections=False, name=name)
 
 
-def make_mlp(hparams, layers, name=None):
+def make_mlp(hparams, layers, name=None, **kwargs):
     """Constructs an MLP with the given layers, using hparams.activation."""
     return snt.nets.MLP(
-        layers, activation=activation(hparams), name=name or "MLP")
+        layers, activation=activation(hparams), name=name or "MLP", **kwargs)
 
 
 def concat_features(tensors):
@@ -180,6 +180,14 @@ def dynamic_hparam(key, value):
                 name=key)
             collection.append(tensor)
     return collection[0]
+
+
+def batch_size_from_nested_tensors(tensors):
+    """Returns the batch dimension from the first non-scalar tensor given."""
+    for tensor in snt.nest.flatten(tensors):
+        if tensor.get_shape().ndims > 0:
+            return tf.shape(tensor)[0]
+    return None
 
 
 def batch_size(hparams):

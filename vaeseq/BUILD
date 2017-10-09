@@ -6,6 +6,7 @@ test_suite(
     tests = [
           "agent_test",
           "batch_dist_test",
+          "model_test",
           "util_test",
           "//vaeseq/examples/midi:tests",
           "//vaeseq/examples/text:tests",
@@ -101,6 +102,7 @@ py_library(
     name = "codec",
     srcs = ["codec.py"],
     deps = [
+        ":batch_dist",
         ":dist_module",
         ":util",
     ],
@@ -111,5 +113,27 @@ py_library(
     srcs = ["train.py"],
     deps = [
         ":util",
+    ],
+)
+
+py_library(
+    name = "model",
+    srcs = ["model.py"],
+    deps = [
+        ":train",
+        ":util",
+    ],
+)
+
+py_test(
+    name = "model_test",
+    srcs = ["model_test.py"],
+    deps = [
+        ":agent",
+        ":codec",
+        ":hparams",
+        ":model",
+        ":util",
+        "//vaeseq/vae",
     ],
 )

@@ -18,7 +18,7 @@ class BatchDistribution(tf.distributions.Distribution):
             allow_nan_stats=distribution.allow_nan_stats,
             parameters=parameters,
             graph_parents=distribution._graph_parents,
-            name=name or "Batch" + distribution.name
+            name=name or "batch_" + distribution.name
         )
 
     def _sample_n(self, n, seed=None):

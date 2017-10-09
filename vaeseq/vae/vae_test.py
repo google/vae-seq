@@ -13,7 +13,10 @@ from vaeseq import vae as vae_mod
 def _build_vae(hparams):
     """Constructs a VAE."""
     obs_encoder = codec.MLPObsEncoder(hparams)
-    obs_decoder = codec.BernoulliMLPObsDecoder(hparams)
+    obs_decoder = codec.MLPObsDecoder(
+        hparams,
+        codec.BernoulliDecoder(squeeze_input=True),
+        param_size=1)
     agent = agent_mod.EncodeObsAgent(obs_encoder)
     return vae_mod.make(hparams, agent, obs_encoder, obs_decoder)
 
@@ -107,7 +110,7 @@ class VAETest(tf.test.TestCase):
 
     def _test_vae(self, vae_type):
         """Make sure that all tensors and assertions evaluate without error."""
-        hparams = hparams_mod.make_hparams(obs_shape=[2], vae_type=vae_type)
+        hparams = hparams_mod.make_hparams(vae_type=vae_type)
         vae = _build_vae(hparams)
         tensors = _all_tensors(hparams, vae)
         with self.test_session() as sess:

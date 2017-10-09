@@ -56,6 +56,9 @@ model to get an observation.
 
 ## Examples
 
+When you build and install this library via `python setup.py install`,
+the following example programs are installed as well:
+
 ### Text
 
 A character-sequence model that can be used to generate nonsense text
@@ -65,18 +68,24 @@ by a given author.
 To train on Andrej Karpathy's "Tiny Shakespeare" dataset:
 ```shell
 $ wget https://github.com/karpathy/char-rnn/raw/master/data/tinyshakespeare/input.txt
-$ bazel run -c opt //vaeseq/examples/text:train -- \
-    --train_corpus input.txt \
-    --log_dir /tmp/text \
-    --hparams "vae_type=SRNN,sequence_size=40" \
-    --iters 1000000
+$ vaeseq-text train --log-dir /tmp/text --train-corpus input.txt \
+    --num-steps 1000000
 ```
 
 After training has completed, you can generate text:
 ```shell
-$ bazel run -c opt //vaeseq/examples/text:generate -- \
-    --train_corpus input.txt \
-    --log_dir /tmp/text \
-    --hparams "vae_type=SRNN,sequence_size=1000" \
-    --samples 20
+$ vaeseq-text train --log-dir /tmp/text --vocab-corpus input.txt \
+    --length 1000
+    --num-samples 20
 ```
+
+Or you can tell how likely a piece of text is to be Shakespearean:
+```shell
+$ vaeseq-text evaluate --log-dir /tmp/text --vocab-corpus input.txt \
+    --eval-corpus foo.txt
+```
+
+### MIDI
+
+Similar to the text example above, but now modeling MIDI music
+(specifically, piano rolls). Installed under `vaeseq-midi`.

@@ -17,24 +17,75 @@ class EvalCore(snt.RNNCore):
     def __init__(self, agent, latent_distcore, obs_distcore, name=None):
         super(EvalCore, self).__init__(name=name)
         assert isinstance(agent, agent_mod.Agent)
+        self._agent = agent
+        with self._enter_variable_scope():
+            self._from_contexts = EvalCoreFromContexts(latent_distcore,
+                                                       obs_distcore)
+
+    @property
+    def from_contexts(self):
+        """Return an EvalCore that operates on Agent contexts."""
+        return self._from_contexts
+
+    @property
+    def state_size(self):
+        """Sizes of state tensors."""
+        return (self._agent.state_size, self.from_contexts.state_size)
+
+    def initial_state(self, batch_size):
+        """Override default implementation to support heterogeneous dtypes."""
+        # TODO: support trainable initial states.
+        return (self._agent.initial_state(batch_size),
+                self.from_contexts.initial_state(batch_size))
+
+    @property
+    def output_size(self):
+        """Sizes of output tensors."""
+        return self.from_contexts.output_size
+
+    def _build(self, input_obs, state):
+        input_, obs = input_obs
+        agent_state, inner_state = state
+        context = self._agent.context(input_, agent_state)
+        output, inner_state = self.from_contexts((context, obs), inner_state)
+        agent_state = self._agent.observe(input_, obs, agent_state)
+        state = (agent_state, inner_state)
+        return output, state
+
+    def log_probs(self, agent_inputs, observed, initial_state=None):
+        """Compute a monte-carlo estimate of log-prob(observed)."""
+        if initial_state is None:
+            batch_size = util.batch_size_from_nested_tensors(observed)
+            initial_state = self.initial_state(batch_size)
+        cell = self
+        inputs = (agent_inputs, observed)
+        cell, inputs = util.add_support_for_scalar_rnn_inputs(cell, inputs)
+        return tf.nn.dynamic_rnn(
+            cell, inputs,
+            initial_state=initial_state,
+            dtype=tf.float32)[0]
+
+
+class EvalCoreFromContexts(snt.RNNCore):
+    """Same as EvalCore, but start from contexts rather than agent inputs."""
+
+    def __init__(self, latent_distcore, obs_distcore, name=None):
+        super(EvalCoreFromContexts, self).__init__(name=name)
         assert isinstance(latent_distcore, dist_module.DistCore)
         assert isinstance(obs_distcore, dist_module.DistCore)
-        self._agent = agent
         self._latent_distcore = latent_distcore
         self._obs_distcore = obs_distcore
 
     @property
     def state_size(self):
         """Sizes of state tensors."""
-        return (self._agent.state_size,            # agent state
-                self._latent_distcore.state_size,  # latent core state
+        return (self._latent_distcore.state_size,  # latent core state
                 self._obs_distcore.state_size,)    # observation core state
 
     def initial_state(self, batch_size):
         """Override default implementation to support heterogeneous dtypes."""
         # TODO: support trainable initial states.
-        return (self._agent.initial_state(batch_size),
-                self._latent_distcore.samples.initial_state(batch_size),
+        return (self._latent_distcore.samples.initial_state(batch_size),
                 self._obs_distcore.samples.initial_state(batch_size),)
 
     @property
@@ -42,25 +93,23 @@ class EvalCore(snt.RNNCore):
         """Sizes of output tensors."""
         return tf.TensorShape([])  # log_prob
 
-    def _build(self, input_obs, state):
-        input_, obs = input_obs
-        agent_state, latent_state, obs_state = state
-        context = self._agent.context(input_, agent_state)
+    def _build(self, context_obs, state):
+        context, obs = context_obs
+        latent_state, obs_state = state
         latent, latent_state = self._latent_distcore.samples(
             context, latent_state)
         output, obs_state = self._obs_distcore.log_probs(
             ((context, latent), obs), obs_state)
-        agent_state = self._agent.observe(input_, obs, agent_state)
-        state = (agent_state, latent_state, obs_state)
+        state = (latent_state, obs_state)
         return output, state
 
-    def log_probs(self, agent_inputs, observed, initial_state=None):
+    def log_probs(self, contexts, observed, initial_state=None):
         """Compute a monte-carlo estimate of log-prob(observed)."""
         if initial_state is None:
-            batch_size = tf.shape(agent_inputs)[0]
+            batch_size = util.batch_size_from_nested_tensors(observed)
             initial_state = self.initial_state(batch_size)
         cell = self
-        inputs = (agent_inputs, observed)
+        inputs = (contexts, observed)
         cell, inputs = util.add_support_for_scalar_rnn_inputs(cell, inputs)
         return tf.nn.dynamic_rnn(
             cell, inputs,

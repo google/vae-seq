@@ -17,24 +17,18 @@ setup(
     long_description=open("README.md").read(),
     packages=find_packages(),
     install_requires=[
+        "dm-sonnet>=1.10",
         "future>=0.16.0",
         "numpy>=1.12.0",
-        "tensorflow>=1.3.0",
-        "dm-sonnet>=1.10",
         "pretty-midi>=0.2.8",
         "scipy>=0.16.0",
+        "six>=1.0.0",
+        "tensorflow>=1.3.0",
     ],
     entry_points={
         "console_scripts": [
-            # examples/text
-            "vaeseq-text-train = vaeseq.examples.text.train:entry_point",
-            "vaeseq-text-generate = vaeseq.examples.text.generate:entry_point",
-            "vaeseq-text-eval = vaeseq.examples.text.evaluate:entry_point",
-
-            # examples/midi
-            "vaeseq-midi-train = vaeseq.examples.midi.train:entry_point",
-            "vaeseq-midi-generate = vaeseq.examples.midi.generate:entry_point",
-            "vaeseq-midi-eval = vaeseq.examples.midi.evaluate:entry_point",
+            "vaeseq-text = vaeseq.examples.text.text:main",
+            "vaeseq-midi = vaeseq.examples.midi.midi:main",
         ],
     },
     test_suite="setup.tests",

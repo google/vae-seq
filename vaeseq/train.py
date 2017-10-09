@@ -1,7 +1,5 @@
 """Training subgraph for a VAE."""
 
-from __future__ import print_function
-
 import sonnet as snt
 import tensorflow as tf
 
@@ -15,6 +13,8 @@ class TrainOps(snt.AbstractModule):
         super(TrainOps, self).__init__(name=name)
         self._hparams = hparams
         self._vae = vae
+        with self._enter_variable_scope():
+            self._optimizer = tf.train.AdamOptimizer(hparams.learning_rate)
 
     def _build(self, contexts, observed):
         hparams = self._hparams
@@ -22,7 +22,7 @@ class TrainOps(snt.AbstractModule):
         log_probs = self._vae.log_prob_observed(contexts, latents, observed)
 
         # Compute the ELBO.
-        batch_size = tf.to_float(util.batch_size(hparams))
+        batch_size = tf.to_float(tf.shape(log_probs)[0])
         log_prob = tf.reduce_sum(log_probs) / batch_size
         tf.summary.scalar("log_prob", log_prob)
         divergence = tf.reduce_sum(divs) / batch_size
@@ -35,19 +35,19 @@ class TrainOps(snt.AbstractModule):
             tf.to_float(tf.train.get_or_create_global_step()) /
             hparams.divergence_strength_halfway_point - 1.)
         tf.summary.scalar("divergence_strength", divergence_strength)
-        elbo_opt = log_prob - divergence * divergence_strength
+        relaxed_elbo = log_prob - divergence * divergence_strength
+        loss = -relaxed_elbo
 
         # Compute gradients.
-        optimizer = tf.train.AdamOptimizer(hparams.learning_rate)
-        grads_and_vars = optimizer.compute_gradients(-elbo_opt)
+        grads_and_vars = self._optimizer.compute_gradients(loss)
         for grad, var in grads_and_vars:
             tag = var.name.replace(":0", "")
             if grad is None:
-                print("WARNING: Gradient for " + tag + " is missing!")
+                tf.logging.warn("Missing gradient for %s", tag)
                 continue
             tf.summary.histogram(tag, var)
             tf.summary.histogram(tag + "/gradient", grad)
-        train_op = optimizer.apply_gradients(
+        train_op = self._optimizer.apply_gradients(
             grads_and_vars, global_step=tf.train.get_or_create_global_step())
         if hparams.check_numerics and False:  # FIXME
             deps = [tf.add_check_numerics_ops(), train_op]
@@ -58,5 +58,5 @@ class TrainOps(snt.AbstractModule):
             log_prob=log_prob,
             divergence=divergence,
             elbo=elbo,
-            elbo_opt=elbo_opt)
+            loss=loss)
         return train_op, debug_tensors

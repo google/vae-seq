@@ -63,7 +63,7 @@ class GenCore(snt.RNNCore):
     def generate(self, agent_inputs, initial_state=None):
         """Generates sequences of observations, latents, and agent states."""
         if initial_state is None:
-            batch_size = tf.shape(agent_inputs)[0]
+            batch_size = util.batch_size_from_nested_tensors(agent_inputs)
             initial_state = self.initial_state(batch_size)
         cell = self
         cell, agent_inputs = util.add_support_for_scalar_rnn_inputs(

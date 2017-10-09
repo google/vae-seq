@@ -67,10 +67,11 @@ class ObsDist(dist_module.DistCore):
     def event_dtype(self):
         return self._obs_decoder.event_dtype
 
-    def dist(self, params):
-        return self._obs_decoder.dist(params)
+    def dist(self, params, name=None):
+        return self._obs_decoder.dist(params, name=name)
 
     def _next_state(self, d_state, event=None):
+        del event  # Not used.
         return d_state
 
     def _build(self, inputs, d_state):
@@ -99,16 +100,17 @@ class NoLatents(dist_module.DistCore):
     def event_dtype(self):
         return tf.float32
 
-    def dist(self, params, name=None):
-        del params  # No parameters needed.
-        null_events = tf.zeros([util.batch_size(self._hparams), 0],
-                               dtype=self.event_dtype)
-        return tf.contrib.distributions.VectorDeterministic(null_events)
+    def dist(self, batch_size, name=None):
+        null_events = tf.zeros([batch_size, 0], dtype=self.event_dtype)
+        null_events.set_shape([None, 0])
+        return tf.contrib.distributions.VectorDeterministic(
+            null_events, name=name or self.module_name + "_dist")
 
     def _next_state(self, state_arg, event=None):
         del state_arg  # No state needed.
         return ()
 
     def _build(self, context, state):
-        del context, state
-        return (), ()
+        del state  # No state needed.
+        batch_size = util.batch_size_from_nested_tensors(context)
+        return batch_size, ()

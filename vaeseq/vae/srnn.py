@@ -53,7 +53,7 @@ class SRNN(base.VAEBase):
 
     def infer_latents(self, contexts, observed):
         hparams = self._hparams
-        batch_size = util.batch_size(hparams)
+        batch_size = util.batch_size_from_nested_tensors(observed)
         z_initial, d_initial = self.latent_prior_distcore.samples.initial_state(
             batch_size)
         d_outs, _ = tf.nn.dynamic_rnn(
@@ -113,16 +113,17 @@ class ObsDist(dist_module.DistCore):
     def event_dtype(self):
         return self._obs_decoder.event_dtype
 
-    def dist(self, params):
-        return self._obs_decoder.dist(params)
+    def dist(self, params, name=None):
+        return self._obs_decoder.dist(params, name=name)
 
     def _next_state(self, d_state, event=None):
+        del event  # Not used.
         return d_state
 
     def _build(self, inputs, d_state):
         context, latent = inputs
         d_out, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._obs_decoder(d_out, latent), d_state
+        return self._obs_decoder((d_out, latent)), d_state
 
 
 class LatentPrior(dist_module.DistCore):
@@ -146,8 +147,8 @@ class LatentPrior(dist_module.DistCore):
     def event_dtype(self):
         return self._latent_p.event_dtype
 
-    def dist(self, params):
-        return self._latent_p.dist(params)
+    def dist(self, params, name=None):
+        return self._latent_p.dist(params, name=name)
 
     def _next_state(self, d_state, event=None):
         return (event, d_state)

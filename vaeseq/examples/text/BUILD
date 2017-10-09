@@ -21,15 +21,6 @@ py_test(
 )
 
 py_library(
-    name = "codec",
-    srcs = ["codec.py"],
-    deps = [
-        "//vaeseq:codec",
-        "//vaeseq:util",
-    ],
-)
-
-py_library(
     name = "hparams",
     srcs = ["hparams.py"],
     deps = [
@@ -41,10 +32,11 @@ py_library(
     name = "model",
     srcs = ["model.py"],
     deps = [
-        ":codec",
+        ":dataset",
         "//vaeseq/vae",
         "//vaeseq:agent",
-        "//vaeseq:train",
+        "//vaeseq:codec",
+        "//vaeseq:model",
         "//vaeseq:util",
     ],
 )
@@ -53,41 +45,17 @@ py_test(
     name = "model_test",
     srcs = ["model_test.py"],
     deps = [
-        ":dataset",
         ":hparams",
         ":model",
-        "//vaeseq:util",
+        "//vaeseq:model_test",
     ],
 )
 
 py_binary(
-    name = "train",
-    srcs = ["train.py"],
+    name = "text",
+    srcs = ["text.py"],
     deps = [
-        ":dataset",
         ":hparams",
         ":model",
-        "//vaeseq:util",
-    ],
-)
-
-py_binary(
-    name = "generate",
-    srcs = ["generate.py"],
-    deps = [
-        ":dataset",
-        ":hparams",
-        ":model",
-    ],
-)
-
-py_binary(
-    name = "evaluate",
-    srcs = ["evaluate.py"],
-    deps = [
-        ":dataset",
-        ":hparams",
-        ":model",
-        "//vaeseq:util",
     ],
 )

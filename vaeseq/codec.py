@@ -1,12 +1,19 @@
 """Modules for encoding and decoding observations."""
 
-import abc
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 
+from . import batch_dist
 from . import dist_module
 from . import util
+
+
+class EncoderSequence(snt.Sequential):
+    """A wrapper arount snt.Sequential that also implements output_size."""
+
+    @property
+    def output_size(self):
+        return self.layers[-1].output_size
 
 
 class FlattenObsEncoder(snt.AbstractModule):
@@ -51,47 +58,54 @@ class FlattenObsEncoder(snt.AbstractModule):
         return ret
 
 
-class MLPObsEncoder(snt.AbstractModule):
+def MLPObsEncoder(hparams, name=None):
     """Observation -> encoded, flat observation."""
+    name = name or "mlp_obs_encoder"
+    mlp = util.make_mlp(hparams, hparams.obs_encoder_fc_layers,
+                        name=name + "/mlp")
+    return EncoderSequence([FlattenObsEncoder(), mlp], name=name)
 
-    def __init__(self, hparams, name=None):
-        super(MLPObsEncoder, self).__init__(name=name)
-        with self._enter_variable_scope():
-            self._flatten = FlattenObsEncoder()
-            self._mlp = util.make_mlp(
-                hparams,
-                hparams.obs_encoder_fc_layers)
+
+class DecoderSequence(dist_module.DistModule):
+    """A sequence of zero or more AbstractModules, followed by a DistModule."""
+
+    def __init__(self, input_encoders, decoder, name=None):
+        super(DecoderSequence, self).__init__(name=name)
+        self._input_encoders = input_encoders
+        self._decoder = decoder
 
     @property
-    def output_size(self):
-        """Returns the output Tensor shapes."""
-        return self._mlp.output_size
+    def event_dtype(self):
+        return self._decoder.event_dtype
 
-    def _build(self, obs):
-        return self._mlp(self._flatten(obs))
+    @property
+    def event_size(self):
+        return self._decoder.event_size
 
+    def dist(self, params, name=None):
+        return self._decoder.dist(params, name=name)
 
-class MLPObsDecoderBase(dist_module.DistModule):
-    """Base class for MLP -> Distribution decoders."""
-
-    def __init__(self, hparams, param_size, name=None):
-        super(MLPObsDecoderBase, self).__init__(name=name)
-        self._hparams = hparams
-        self._param_size = param_size
-
-    def _build(self, *inputs):
-        hparams = self._hparams
-        layers = hparams.obs_decoder_fc_hidden_layers + [self._param_size]
-        mlp = util.make_mlp(hparams, layers)
-        return mlp(util.concat_features(inputs))
+    def _build(self, inputs):
+        if self._input_encoders:
+            inputs = snt.Sequential(self._input_encoders)(inputs)
+        return self._decoder(inputs)
 
 
-class BernoulliMLPObsDecoder(MLPObsDecoderBase):
-    """Inputs -> Bernoulli(obs; logits=mlp(inputs))."""
+def MLPObsDecoder(hparams, decoder, param_size, name=None):
+    """Inputs -> decoder(obs; mlp(inputs))."""
+    name = name or "mlp_" + decoder.module_name
+    layers = hparams.obs_decoder_fc_hidden_layers + [param_size]
+    mlp = util.make_mlp(hparams, layers, name=name + "/mlp")
+    return DecoderSequence([util.concat_features, mlp], decoder, name=name)
 
-    def __init__(self, hparams, dtype=tf.int32, name=None):
+
+class BernoulliDecoder(dist_module.DistModule):
+    """Inputs -> Bernoulli(obs; logits=inputs)."""
+
+    def __init__(self, dtype=tf.int32, squeeze_input=False, name=None):
         self._dtype = dtype
-        super(BernoulliMLPObsDecoder, self).__init__(hparams, 1, name=name)
+        self._squeeze_input = squeeze_input
+        super(BernoulliDecoder, self).__init__(name=name)
 
     @property
     def event_dtype(self):
@@ -101,20 +115,24 @@ class BernoulliMLPObsDecoder(MLPObsDecoderBase):
     def event_size(self):
         return tf.TensorShape([])
 
+    def _build(self, inputs):
+        if self._squeeze_input:
+            inputs = tf.squeeze(inputs, axis=-1)
+        return inputs
+
     def dist(self, params, name=None):
         return tf.distributions.Bernoulli(
-            logits=tf.squeeze(params, axis=-1),
+            logits=params,
             dtype=self._dtype,
             name=name or self.module_name + "_dist")
 
 
-class CategoricalMLPObsDecoder(MLPObsDecoderBase):
-    """Inputs -> Categorical(obs; logits=mlp(inputs))."""
+class CategoricalDecoder(dist_module.DistModule):
+    """Inputs -> Categorical(obs; logits=inputs)."""
 
-    def __init__(self, hparams, num_classes, dtype=tf.int32, name=None):
+    def __init__(self, dtype=tf.int32, name=None):
         self._dtype = dtype
-        super(CategoricalMLPObsDecoder, self).__init__(
-            hparams, num_classes, name=name)
+        super(CategoricalDecoder, self).__init__(name=name)
 
     @property
     def event_dtype(self):
@@ -123,9 +141,65 @@ class CategoricalMLPObsDecoder(MLPObsDecoderBase):
     @property
     def event_size(self):
         return tf.TensorShape([])
+
+    def _build(self, inputs):
+        return inputs
 
     def dist(self, params, name=None):
         return tf.distributions.Categorical(
             logits=params,
             dtype=self._dtype,
             name=name or self.module_name + "_dist")
+
+
+class NormalDecoder(dist_module.DistModule):
+    """Inputs -> Normal(obs; loc=half(inputs), scale=project(half(inputs)))"""
+
+    def __init__(self, hparams, name=None):
+        self._hparams = hparams
+        super(NormalDecoder, self).__init__(name=name)
+
+    @property
+    def event_dtype(self):
+        return tf.float32
+
+    @property
+    def event_size(self):
+        return tf.TensorShape([])
+
+    def _build(self, inputs):
+        loc, unproj_scale = tf.split(inputs, 2, axis=-1)
+        scale = util.positive_projection(self._hparams)(unproj_scale)
+        return loc, scale
+
+    def dist(self, params, name=None):
+        loc, scale = params
+        return tf.distributions.Normal(
+            loc=loc,
+            scale=scale,
+            name=name or self.module_name + "_dist")
+
+
+class BatchDecoder(dist_module.DistModule):
+    """Wrap a decoder to model batches of events."""
+
+    def __init__(self, decoder, event_size, name=None):
+        self._decoder = decoder
+        self._event_size = tf.TensorShape(event_size)
+        super(BatchDecoder, self).__init__(name=name)
+
+    @property
+    def event_dtype(self):
+        return self._decoder.event_dtype
+
+    @property
+    def event_size(self):
+        return self._event_size
+
+    def _build(self, inputs):
+        return self._decoder(inputs)
+
+    def dist(self, params, name=None):
+        return batch_dist.BatchDistribution(
+            self._decoder.dist(params, name=name),
+            ndims=self._event_size.ndims)

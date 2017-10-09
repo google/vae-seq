@@ -21,16 +21,6 @@ py_test(
 )
 
 py_library(
-    name = "codec",
-    srcs = ["codec.py"],
-    deps = [
-        "//vaeseq:batch_dist",
-        "//vaeseq:codec",
-        "//vaeseq:util",
-    ],
-)
-
-py_library(
     name = "hparams",
     srcs = ["hparams.py"],
     deps = [
@@ -42,10 +32,11 @@ py_library(
     name = "model",
     srcs = ["model.py"],
     deps = [
-        ":codec",
+        ":dataset",
         "//vaeseq/vae",
         "//vaeseq:agent",
-        "//vaeseq:train",
+        "//vaeseq:codec",
+        "//vaeseq:model",
         "//vaeseq:util",
     ],
 )
@@ -57,37 +48,16 @@ py_test(
         ":dataset",
         ":hparams",
         ":model",
+        "//vaeseq:model_test",
         "//vaeseq:util",
     ],
 )
 
 py_binary(
-    name = "train",
-    srcs = ["train.py"],
-    deps = [
-        ":dataset",
-        ":hparams",
-        ":model",
-        "//vaeseq:util",
-    ],
-)
-
-py_binary(
-    name = "generate",
-    srcs = ["generate.py"],
+    name = "midi",
+    srcs = ["midi.py"],
     deps = [
         ":hparams",
         ":model",
-    ],
-)
-
-py_binary(
-    name = "evaluate",
-    srcs = ["evaluate.py"],
-    deps = [
-        ":dataset",
-        ":hparams",
-        ":model",
-        "//vaeseq:util",
     ],
 )
