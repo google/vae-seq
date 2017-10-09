@@ -38,15 +38,15 @@ class AgentTest(tf.test.TestCase):
 
     def test_null_inputs(self):
         with self.test_session() as sess:
+            null_inputs = _make_agent().get_inputs(3, 5)
             self.assertAllEqual(
-                sess.run(tf.shape(agent_mod.null_inputs(3, 5))), [3, 5, 0])
+                sess.run(tf.shape(null_inputs)), [3, 5, 0])
 
     def test_contexts_for_static_obs(self):
-        agent = _make_agent()
         obs = tf.constant([[[1.], [2.], [3.]],
                            [[4.], [5.], [6.]]])
-        ctx = agent_mod.contexts_for_static_observations(
-            obs, agent, agent_mod.null_inputs(2, 3))
+        agent = _make_agent()
+        ctx = agent.contexts_for_static_observations(obs)
         with self.test_session() as sess:
             self.assertAllClose(
                 sess.run(ctx),
@@ -56,10 +56,10 @@ class AgentTest(tf.test.TestCase):
     def test_contexts_from_env(self):
         env = TestEnvironment(name="test_env")
         agent = _make_agent()
-        ctx, obs = agent_mod.contexts_and_observations_from_environment(
-            env, agent, agent_mod.null_inputs(2, 3))
-        ctx2 = agent_mod.contexts_for_static_observations(
-            obs, agent, agent_mod.null_inputs(2, 3))
+        agent_input = agent.get_inputs(2, 3)
+        ctx, obs = agent.contexts_and_observations_from_environment(
+            env, agent_input)
+        ctx2 = agent.contexts_for_static_observations(obs, agent_input)
         with self.test_session() as sess:
             vals = sess.run(dict(ctx=ctx, ctx2=ctx2, obs=obs))
         self.assertAllClose(vals['ctx'], vals['ctx2'])

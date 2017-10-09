@@ -30,10 +30,7 @@ def _observed(hparams):
 def _inf_tensors(hparams, vae):
     """Simple inference graph."""
     observed = _observed(hparams)
-    agent_inputs = agent_mod.null_inputs(
-        util.batch_size(hparams), util.sequence_size(hparams))
-    contexts = agent_mod.contexts_for_static_observations(
-        observed, vae.agent, agent_inputs)
+    contexts = vae.agent.contexts_for_static_observations(observed)
     latents, divs = vae.infer_latents(contexts, observed)
     log_probs = vae.log_prob_observed(contexts, latents, observed)
     elbo = tf.reduce_sum(log_probs - divs)
@@ -42,8 +39,8 @@ def _inf_tensors(hparams, vae):
 
 def _gen_tensors(hparams, gen_core):
     """Samples observations and latent variables from the VAE."""
-    agent_inputs = agent_mod.null_inputs(
-        util.batch_size(hparams), util.sequence_size(hparams))
+    agent_inputs = gen_core.agent.get_inputs(util.batch_size(hparams),
+                                             util.sequence_size(hparams))
     generated, sampled_latents, _ = gen_core.generate(agent_inputs)
     return [generated, sampled_latents]
 
@@ -51,20 +48,34 @@ def _gen_tensors(hparams, gen_core):
 def _eval_tensors(hparams, eval_core):
     """Calculates the log-probabilities of the observations."""
     observed = _observed(hparams)
-    agent_inputs = agent_mod.null_inputs(
-        util.batch_size(hparams), util.sequence_size(hparams))
-    log_probs = eval_core.log_probs(agent_inputs, observed)
-    return [log_probs]
+    agent_inputs = eval_core.agent.get_inputs(util.batch_size(hparams),
+                                              util.sequence_size(hparams))
+    contexts = eval_core.agent.contexts_for_static_observations(observed)
+    log_probs1 = eval_core.log_probs(agent_inputs, observed, samples=100)
+    log_probs2 = eval_core.from_contexts.log_probs(contexts, observed,
+                                                   samples=100)
+    return [log_probs1, log_probs2]
 
 
-def _test_assertions(inf_tensors, gen_tensors, eval_tensors):
+def _assert_close(tensor1, tensor2, atol=1e-5, message=None):
+    return tf.assert_less(tf.abs(tensor1 - tensor2), atol,
+                          data=[tensor1, tensor2],
+                          message=message)
+
+
+def _test_assertions(hparams, inf_tensors, gen_tensors, eval_tensors):
     """Returns in-graph assertions for testing."""
     observed, latents, divs, log_probs, elbo = inf_tensors
     generated, sampled_latents = gen_tensors
-    eval_log_probs, = eval_tensors
+    eval_log_probs1, eval_log_probs2 = eval_tensors
+    log_prob_tol = 0.1
+    if hparams.vae_type == "RNN":
+        # No latent variables to average over.
+        log_prob_tol = 1e-5
     assertions = [
         tf.assert_non_negative(divs),
         tf.assert_non_positive(log_probs),
+        _assert_close(eval_log_probs1, eval_log_probs2, atol=log_prob_tol),
         tf.assert_equal(
             tf.shape(observed), tf.shape(generated),
             message="Shapes: training data vs. generated data"),
@@ -75,7 +86,7 @@ def _test_assertions(inf_tensors, gen_tensors, eval_tensors):
             tf.shape(divs), tf.shape(log_probs),
             message="Shapes: divergences vs. log-probs"),
         tf.assert_equal(
-            tf.shape(log_probs), tf.shape(eval_log_probs),
+            tf.shape(log_probs), tf.shape(eval_log_probs1),
             message="Shapes: log-probs from inference vs. eval"),
         tf.assert_equal(
             tf.shape(observed)[:2], tf.shape(latents)[:2],
@@ -102,7 +113,8 @@ def _all_tensors(hparams, vae):
     inf_tensors = _inf_tensors(hparams, vae)
     gen_tensors = _gen_tensors(hparams, vae.gen_core)
     eval_tensors = _eval_tensors(hparams, vae.eval_core)
-    assertions = _test_assertions(inf_tensors, gen_tensors, eval_tensors)
+    assertions = _test_assertions(hparams,
+                                  inf_tensors, gen_tensors, eval_tensors)
     return inf_tensors + gen_tensors + eval_tensors + assertions
 
 

@@ -129,9 +129,11 @@ class ModelBase(object):
                 summary_op=tf.summary.merge(slow_summaries)))
 
             # Add sample generated sequences.
-            batch_size, sequence_size = tf.unstack(tf.shape(observed)[:2])
+            obs_shape = tf.shape(observed)
+            batch_size = obs_shape[0]
+            sequence_size = obs_shape[1]
             generated = self.vae.gen_core.generate(
-                self._agent_inputs(batch_size, sequence_size))[0]
+                self.vae.agent.get_inputs(batch_size, sequence_size))[0]
             hooks.append(tf.train.SummarySaverHook(
                 save_steps=1000,
                 output_dir=self._session_params.log_dir,
@@ -155,8 +157,8 @@ class ModelBase(object):
     def generate(self):
         """Generates sequences from a trained model."""
         generated = self.vae.gen_core.generate(
-            self._agent_inputs(util.batch_size(self.hparams),
-                               util.sequence_size(self.hparams)))[0]
+            self.vae.agent.get_inputs(util.batch_size(self.hparams),
+                                      util.sequence_size(self.hparams)))[0]
         rendered = self._render(generated)
         with self.eval_session() as sess:
             batch = sess.run(rendered)
@@ -177,10 +179,6 @@ class ModelBase(object):
     @abc.abstractmethod
     def _make_vae(self):
         """Constructs the VAE."""
-
-    @abc.abstractmethod
-    def _agent_inputs(self, batch_size, sequence_size):
-        """Returns agent_inputs for generating new sequences."""
 
     @abc.abstractmethod
     def _open_dataset(self, dataset):

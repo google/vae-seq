@@ -46,6 +46,70 @@ class Agent(snt.AbstractModule):
         # Default to providing the context.
         return self.context(agent_input, state)
 
+    def get_inputs(self, batch_size, sequence_size):
+        """Creates an input tensor. Note that the sizes are suggestions."""
+        # Use this if the agent doesn't take any external input.
+        ret = tf.zeros([batch_size, sequence_size, 0], name="null_inputs")
+        ret.set_shape([None, None, 0])
+        return ret
+
+    def contexts_for_static_observations(self, observed,
+                                         agent_inputs=None,
+                                         initial_state=None):
+        """Generate contexts for a static sequence of observations."""
+        obs_shape = tf.shape(observed)
+        batch_size = obs_shape[0]
+        if initial_state is None:
+            initial_state = self.initial_state(batch_size)
+        if agent_inputs is None:
+            agent_inputs = self.get_inputs(batch_size, obs_shape[1])
+            agent_inputs.set_shape(
+                observed.get_shape()[:2].concatenate(
+                    agent_inputs.get_shape()[2:]))
+
+        def _step(input_obs, state):
+            """Record the agent's context for the given observation."""
+            agent_input, obs = input_obs
+            context = self.context(agent_input, state)
+            state = self.observe(agent_input, obs, state)
+            return context, state
+
+        cell = util.WrapRNNCore(_step, self.state_size, self.context_size)
+        inputs = (agent_inputs, observed)
+        cell, inputs = util.add_support_for_scalar_rnn_inputs(cell, inputs)
+        contexts, _ = util.heterogeneous_dynamic_rnn(
+            cell, inputs,
+            initial_state=initial_state,
+            output_dtypes=self.context_dtype)
+        return contexts
+
+    def contexts_and_observations_from_environment(self, env, agent_inputs):
+        """Generate contexts and observations from an Environment."""
+        batch_size = tf.shape(agent_inputs)[0]
+        initial_state = (self.initial_state(batch_size),
+                         env.initial_state(batch_size))
+
+        def _step(agent_input, state):
+            """Manipulate the environment and record what happens."""
+            agent_state, env_state = state
+            context = self.context(agent_input, agent_state)
+            env_input = self.env_input(agent_input, agent_state)
+            obs, env_state = env(env_input, env_state)
+            agent_state = self.observe(agent_input, obs, agent_state)
+            return (context, obs), (agent_state, env_state)
+
+        cell = util.WrapRNNCore(
+            _step,
+            state_size=(self.state_size, env.state_size),
+            output_size=(self.context_size, env.output_size))
+        cell, agent_inputs = util.add_support_for_scalar_rnn_inputs(
+            cell, agent_inputs)
+        (contexts, observations), _ = util.heterogeneous_dynamic_rnn(
+            cell, agent_inputs,
+            initial_state=initial_state,
+            output_dtypes=(self.context_dtype, env.output_dtype))
+        return contexts, observations
+
 
 class Environment(snt.RNNCore):
     """An Environment is an RNN that takes contexts and returns observations."""
@@ -89,58 +153,3 @@ class EncodeObsAgent(Agent):
 
     def context(self, agent_input, state):
         return state
-
-
-def null_inputs(batch_size, sequence_size, dtype=tf.float32, name=None):
-    """Use this if the agent doesn't take any external input."""
-    return tf.zeros([batch_size, sequence_size, 0], dtype=dtype, name=name)
-
-
-def contexts_for_static_observations(observations, agent, agent_inputs):
-    """Generate contexts for a static sequence of observations."""
-    batch_size = tf.shape(agent_inputs)[0]
-    initial_state = agent.initial_state(batch_size)
-
-    def _step(input_obs, state):
-        """Record the agent's context for the given observation."""
-        agent_input, obs = input_obs
-        context = agent.context(agent_input, state)
-        state = agent.observe(agent_input, obs, state)
-        return context, state
-
-    cell = util.WrapRNNCore(_step, agent.state_size, agent.context_size)
-    inputs = (agent_inputs, observations)
-    cell, inputs = util.add_support_for_scalar_rnn_inputs(cell, inputs)
-    contexts, _ = util.heterogeneous_dynamic_rnn(
-        cell, inputs,
-        initial_state=initial_state,
-        output_dtypes=agent.context_dtype)
-    return contexts
-
-
-def contexts_and_observations_from_environment(env, agent, agent_inputs):
-    """Generate contexts and observations from an environment RNNCore."""
-    batch_size = tf.shape(agent_inputs)[0]
-    initial_state = (agent.initial_state(batch_size),
-                     env.initial_state(batch_size))
-
-    def _step(agent_input, state):
-        """Have the agent manipulate the environment and record what happens."""
-        agent_state, env_state = state
-        context = agent.context(agent_input, agent_state)
-        env_input = agent.env_input(agent_input, agent_state)
-        obs, env_state = env(env_input, env_state)
-        agent_state = agent.observe(agent_input, obs, agent_state)
-        return (context, obs), (agent_state, env_state)
-
-    cell = util.WrapRNNCore(
-        _step,
-        state_size=(agent.state_size, env.state_size),
-        output_size=(agent.context_size, env.output_size))
-    cell, agent_inputs = util.add_support_for_scalar_rnn_inputs(
-        cell, agent_inputs)
-    (contexts, observations), _ = util.heterogeneous_dynamic_rnn(
-        cell, agent_inputs,
-        initial_state=initial_state,
-        output_dtypes=(agent.context_dtype, env.output_dtype))
-    return contexts, observations

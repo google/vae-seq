@@ -61,17 +61,11 @@ class MockModel(model_mod.ModelBase):
         agent = agent_mod.EncodeObsAgent(obs_encoder)
         return vae_mod.make(self.hparams, agent, obs_encoder, obs_decoder)
 
-    def _agent_inputs(self, batch_size, sequence_size):
-        return agent_mod.null_inputs(batch_size, sequence_size)
-
     def _open_dataset(self, dataset):
         batch_size = util.batch_size(self.hparams)
         sequence_size = util.sequence_size(self.hparams)
         observed = tf.zeros([batch_size, sequence_size, 2])
-        contexts = agent_mod.contexts_for_static_observations(
-            observed,
-            self.vae.agent,
-            agent_inputs=self._agent_inputs(batch_size, sequence_size))
+        contexts = self.vae.agent.contexts_for_static_observations(observed)
         return contexts, observed
 
     def _make_output_summary(self, tag, observed):

@@ -44,11 +44,7 @@ class Model(model_mod.ModelBase):
         iterator = dataset.make_initializable_iterator()
         tf.add_to_collection(tf.GraphKeys.LOCAL_INIT_OP, iterator.initializer)
         observed = iterator.get_next()
-        batch_size, sequence_size = tf.unstack(tf.shape(observed)[:2])
-        contexts = agent_mod.contexts_for_static_observations(
-            observed,
-            self.vae.agent,
-            agent_inputs=self._agent_inputs(batch_size, sequence_size))
+        contexts = self.vae.agent.contexts_for_static_observations(observed)
         return contexts, observed
 
     # Samples per second when generating audio output.
@@ -80,6 +76,3 @@ class Model(model_mod.ModelBase):
             self._render(observed),
             self.SYNTHESIZED_RATE,
             collections=[])
-
-    def _agent_inputs(self, batch_size, sequence_size):
-        return agent_mod.null_inputs(batch_size, sequence_size)

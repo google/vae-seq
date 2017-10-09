@@ -21,16 +21,20 @@ class GenCore(snt.RNNCore):
         self._obs_distcore = obs_distcore
 
     @property
+    def agent(self):
+        return self._agent
+
+    @property
     def state_size(self):
         """Sizes of state tensors."""
-        return (self._agent.state_size,            # agent state
+        return (self.agent.state_size,             # agent state
                 self._latent_distcore.state_size,  # latent core state
                 self._obs_distcore.state_size,)    # observation core state
 
     def initial_state(self, batch_size):
         """Override default implementation to support heterogeneous dtypes."""
         # TODO: support trainable initial states.
-        return (self._agent.initial_state(batch_size),
+        return (self.agent.initial_state(batch_size),
                 self._latent_distcore.samples.initial_state(batch_size),
                 self._obs_distcore.samples.initial_state(batch_size),)
 
@@ -39,24 +43,24 @@ class GenCore(snt.RNNCore):
         """Sizes of output tensors."""
         return (self._obs_distcore.event_size,     # sampled observations
                 self._latent_distcore.event_size,  # sampled latents
-                self._agent.state_size,)           # agent states
+                self.agent.state_size,)            # agent states
 
     @property
     def output_dtype(self):
         """Types of output tensors."""
         return (self._obs_distcore.event_dtype,
                 self._latent_distcore.event_dtype,
-                self._agent.state_dtype)
+                self.agent.state_dtype)
 
     def _build(self, input_, state):
         agent_state, latent_state, obs_state = state
-        context = self._agent.context(input_, agent_state)
+        context = self.agent.context(input_, agent_state)
         latent, latent_state = self._latent_distcore.samples(
             context, latent_state)
         obs, obs_state = self._obs_distcore.samples(
             (context, latent), obs_state)
         output = (obs, latent, agent_state)
-        agent_state = self._agent.observe(input_, obs, agent_state)
+        agent_state = self.agent.observe(input_, obs, agent_state)
         state = (agent_state, latent_state, obs_state)
         return output, state
 
