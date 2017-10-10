@@ -100,6 +100,9 @@ def main():
     generate_args(subcommands.add_parser(
         "generate", help="Generate some music."))
     flags, unparsed_args = args.parse_known_args(sys.argv[1:])
+    if not hasattr(flags, "entry"):
+        args.print_help()
+        return 1
     tf.logging.set_verbosity(tf.logging.INFO)
     tf.app.run(main=lambda _unused_argv: flags.entry(flags),
                argv=[sys.argv[0]] + unparsed_args)
