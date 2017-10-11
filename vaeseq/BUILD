@@ -10,6 +10,7 @@ test_suite(
           "util_test",
           "//vaeseq/examples/midi:tests",
           "//vaeseq/examples/text:tests",
+          "//vaeseq/examples/play:tests",
           "//vaeseq/vae:vae_test",
     ],
 )

@@ -19,6 +19,7 @@ setup(
     install_requires=[
         "dm-sonnet>=1.10",
         "future>=0.16.0",
+        "gym>=0.9.3",
         "numpy>=1.12.0",
         "pretty-midi>=0.2.8",
         "scipy>=0.16.0",
@@ -29,6 +30,7 @@ setup(
         "console_scripts": [
             "vaeseq-text = vaeseq.examples.text.text:main",
             "vaeseq-midi = vaeseq.examples.midi.midi:main",
+            "vaeseq-play = vaeseq.examples.play.play:main",
         ],
     },
     test_suite="setup.tests",
