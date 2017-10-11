@@ -46,6 +46,10 @@ class Agent(snt.AbstractModule):
         # Default to providing the context.
         return self.context(agent_input, state)
 
+    def agent_variables(self):
+        """Returns the variables to update during RL."""
+        return None
+
     def rewards(self, observed):
         """Extract rewards from a sequence of observations."""
         del observed  # No rewards by default.

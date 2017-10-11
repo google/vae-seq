@@ -17,6 +17,7 @@ class TrainableAgent(agent_mod.Agent):
         self._hparams = hparams
         self._obs_encoder = obs_encoder
         self._action_size = tf.TensorShape([self._hparams.game_action_space])
+        self._agent_variables = None
         with self._enter_variable_scope():
             self._policy_rnn = util.make_rnn(hparams, name="policy_rnn")
             self._project_act = util.make_mlp(
@@ -37,15 +38,20 @@ class TrainableAgent(agent_mod.Agent):
                 self._action_size,
                 self._obs_encoder.output_size)
 
+    @property
+    def state_dtype(self):
+        return (tf.float32, tf.float32, tf.float32)
+
     def initial_state(self, batch_size):
         return snt.nest.map(
             lambda size: tf.zeros([batch_size] +
                                   tf.TensorShape(size).as_list()),
             self.state_size)
 
-    @property
-    def state_dtype(self):
-        return (tf.float32, tf.float32, tf.float32)
+    def agent_variables(self):
+        if self._agent_variables is None:
+            raise ValueError("Agent variables haven't been constructed yet.")
+        return self._agent_variables
 
     def rewards(self, observed):
         if self._hparams.train_agent:
@@ -58,6 +64,8 @@ class TrainableAgent(agent_mod.Agent):
         rnn_state = state[0]
         hidden, rnn_state = self._policy_rnn(obs_enc, rnn_state)
         action_logits = self._project_act(hidden)
+        self._agent_variables = (self._policy_rnn.get_variables(),
+                                 self._project_act.get_variables())
         return (rnn_state, action_logits, obs_enc)
 
     def context(self, agent_input, state):

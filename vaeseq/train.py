@@ -24,6 +24,13 @@ class Trainer(snt.AbstractModule):
                 self._hparams.clip_gradient_norm)
         return gradients_to_variables
 
+    def _trainable_variables(self, in_agent):
+        trainable_vars = tf.trainable_variables()
+        agent_vars = set(snt.nest.flatten(self._vae.agent.agent_variables()))
+        if in_agent:
+            return [var for var in trainable_vars if var in agent_vars]
+        return [var for var in trainable_vars if var not in agent_vars]
+
     def _build(self, contexts, observed, rewards=None):
         hparams = self._hparams
         latents, divs = self._vae.infer_latents(contexts, observed)
@@ -54,8 +61,16 @@ class Trainer(snt.AbstractModule):
         elbo_loss = -relaxed_elbo
         _scalar_summary("elbo_loss", elbo_loss)
 
+        loss = elbo_loss
+        train_op = tf.contrib.training.create_train_op(
+            elbo_loss,
+            self._optimizer,
+            variables_to_train=self._trainable_variables(in_agent=False),
+            transform_grads_fn=self._transform_gradients,
+            summarize_gradients=True,
+            check_numerics=hparams.check_numerics)
+
         # Compute the reward signal via REINFORCE.
-        reinforce_loss = 0.0
         if rewards is not None:
             cumulative_rewards = tf.reduce_mean(
                 tf.cumsum(rewards, axis=1, reverse=True),
@@ -79,16 +94,18 @@ class Trainer(snt.AbstractModule):
             cumulative_rewards_stopgrad = tf.stop_gradient(cumulative_rewards)
             reinforce_loss = _sum_time_average_batch(
                 -cumulative_rewards_stopgrad * log_probs_stopgrad)
-        _scalar_summary("reinforce_loss", reinforce_loss)
+            _scalar_summary("reinforce_loss", reinforce_loss)
+            loss += reinforce_loss
+            reinforce_train_op = tf.contrib.training.create_train_op(
+                reinforce_loss,
+                self._optimizer,
+                variables_to_train=self._trainable_variables(in_agent=True),
+                transform_grads_fn=self._transform_gradients,
+                summarize_gradients=True,
+                check_numerics=hparams.check_numerics)
+            train_op = tf.group(train_op, reinforce_train_op)
 
-        loss = elbo_loss + reinforce_loss
         _scalar_summary("loss", loss)
-        train_op = tf.contrib.training.create_train_op(
-            loss,
-            self._optimizer,
-            transform_grads_fn=self._transform_gradients,
-            summarize_gradients=True,
-            check_numerics=hparams.check_numerics)
         return train_op, debug_tensors
 
 
