@@ -46,6 +46,11 @@ class Agent(snt.AbstractModule):
         # Default to providing the context.
         return self.context(agent_input, state)
 
+    def rewards(self, observed):
+        """Extract rewards from a sequence of observations."""
+        del observed  # No rewards by default.
+        return None
+
     def get_inputs(self, batch_size, sequence_size):
         """Creates an input tensor. Note that the sizes are suggestions."""
         # Use this if the agent doesn't take any external input.
@@ -57,12 +62,12 @@ class Agent(snt.AbstractModule):
                                          agent_inputs=None,
                                          initial_state=None):
         """Generate contexts for a static sequence of observations."""
-        obs_shape = tf.shape(observed)
-        batch_size = obs_shape[0]
+        batch_size = util.batch_size_from_nested_tensors(observed)
         if initial_state is None:
             initial_state = self.initial_state(batch_size)
         if agent_inputs is None:
-            agent_inputs = self.get_inputs(batch_size, obs_shape[1])
+            sequence_size = util.sequence_size_from_nested_tensors(observed)
+            agent_inputs = self.get_inputs(batch_size, sequence_size)
             agent_inputs.set_shape(
                 observed.get_shape()[:2].concatenate(
                     agent_inputs.get_shape()[2:]))

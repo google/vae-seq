@@ -102,7 +102,9 @@ class ModelBase(object):
         """Trains/continues training the model."""
         global_step = tf.train.get_or_create_global_step()
         contexts, observed = self._open_dataset(dataset)
-        train_op, debug_tensors = self._trainer(contexts, observed)
+        train_op, debug_tensors = self._trainer(
+            contexts, observed,
+            rewards=self.vae.agent.rewards(observed))
         debug_tensors["global_step"] = global_step
 
         hooks = [tf.train.LoggingTensorHook(debug_tensors, every_n_secs=60.)]
@@ -129,9 +131,8 @@ class ModelBase(object):
                 summary_op=tf.summary.merge(slow_summaries)))
 
             # Add sample generated sequences.
-            obs_shape = tf.shape(observed)
-            batch_size = obs_shape[0]
-            sequence_size = obs_shape[1]
+            batch_size = util.batch_size_from_nested_tensors(observed)
+            sequence_size = util.sequence_size_from_nested_tensors(observed)
             generated = self.vae.gen_core.generate(
                 self.vae.agent.get_inputs(batch_size, sequence_size))[0]
             hooks.append(tf.train.SummarySaverHook(

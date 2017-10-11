@@ -100,15 +100,14 @@ def heterogeneous_dynamic_rnn(
     """Wrapper around tf.nn.dynamic_rnn that supports heterogeneous outputs."""
     time_axis = 0 if time_major else 1
     batch_axis = 1 if time_major else 0
-    first_input_shape = tf.shape(snt.nest.flatten(inputs)[0])
     if initial_state is None:
-        batch_size = first_input_shape[batch_axis]
+        batch_size = batch_size_from_nested_tensors(inputs)
         initial_state = cell.zero_state(batch_size, output_dtypes)
     flat_dtypes = snt.nest.flatten(output_dtypes)
     flat_output_size = snt.nest.flatten(cell.output_size)
     # The first output will be returned the normal way; the rest will
     # be returned via state TensorArrays.
-    input_length = first_input_shape[time_axis]
+    input_length = sequence_size_from_nested_tensors(inputs)
     aux_output_tas = [
         tf.TensorArray(
             dtype,
@@ -190,6 +189,14 @@ def batch_size_from_nested_tensors(tensors):
     return None
 
 
+def sequence_size_from_nested_tensors(tensors):
+    """Returns the time dimension from the first K-tensor given where K > 1."""
+    for tensor in snt.nest.flatten(tensors):
+        if tensor.get_shape().ndims > 1:
+            return tf.shape(tensor)[1]
+    return None
+
+
 def batch_size(hparams):
     """Returns a non-constant Tensor that evaluates to hparams.batch_size."""
     return dynamic_hparam("batch_size", hparams.batch_size)
@@ -198,3 +205,13 @@ def batch_size(hparams):
 def sequence_size(hparams):
     """Returns a non-constant Tensor that evaluates to hparams.sequence_size."""
     return dynamic_hparam("sequence_size", hparams.sequence_size)
+
+
+def set_tensor_shapes(tensors, shapes, add_batch_dim=False):
+    """Set static shape information for nested tuples of tensors and shapes."""
+    if add_batch_dim:
+        shapes = snt.nest.map(
+            lambda shape: tf.TensorShape([None]).concatenate(shape),
+            shapes)
+    snt.nest.map(lambda tensor, shape: tensor.set_shape(shape),
+                 tensors, shapes)

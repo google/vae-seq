@@ -14,39 +14,95 @@ class Trainer(snt.AbstractModule):
         self._hparams = hparams
         self._vae = vae
         with self._enter_variable_scope():
+            self._ema = ExponentialMovingAverage()
             self._optimizer = tf.train.AdamOptimizer(hparams.learning_rate)
 
-    def _build(self, contexts, observed):
+    def _transform_gradients(self, gradients_to_variables):
+        if self._hparams.clip_gradient_norm > 0:
+            gradients_to_variables = tf.contrib.training.clip_gradient_norms(
+                gradients_to_variables,
+                self._hparams.clip_gradient_norm)
+        return gradients_to_variables
+
+    def _build(self, contexts, observed, rewards=None):
         hparams = self._hparams
         latents, divs = self._vae.infer_latents(contexts, observed)
-        log_probs = self._vae.log_prob_observed(contexts, latents, observed)
+
+        debug_tensors = {}
+        def _scalar_summary(name, tensor):
+            """Add a summary and a debug output tensor."""
+            tensor = tf.convert_to_tensor(tensor, name=name)
+            debug_tensors[name] = tensor
+            tf.summary.scalar(name, tensor)
+
+        def _sum_time_average_batch(tensor):
+            return tf.reduce_mean(tf.reduce_sum(tensor, axis=1), axis=0)
 
         # Compute the ELBO.
-        batch_size = tf.to_float(tf.shape(log_probs)[0])
-        log_prob = tf.reduce_sum(log_probs) / batch_size
-        tf.summary.scalar("log_prob", log_prob)
-        divergence = tf.reduce_sum(divs) / batch_size
-        tf.summary.scalar("divergence", divergence)
-        elbo = log_prob - divergence
-        tf.summary.scalar("elbo", elbo)
-
+        log_probs = self._vae.log_prob_observed(contexts, latents, observed)
+        log_prob = _sum_time_average_batch(log_probs)
+        divergence = _sum_time_average_batch(divs)
+        _scalar_summary("log_prob", log_prob)
+        _scalar_summary("divergence", divergence)
+        _scalar_summary("ELBO", log_prob - divergence)
         # We soften the divergence penalty at the start of training.
         divergence_strength = tf.sigmoid(
             tf.to_float(tf.train.get_or_create_global_step()) /
             hparams.divergence_strength_halfway_point - 1.)
-        tf.summary.scalar("divergence_strength", divergence_strength)
+        _scalar_summary("divergence_strength", divergence_strength)
         relaxed_elbo = log_prob - divergence * divergence_strength
-        loss = -relaxed_elbo
+        elbo_loss = -relaxed_elbo
+        _scalar_summary("elbo_loss", elbo_loss)
 
+        # Compute the reward signal via REINFORCE.
+        reinforce_loss = 0.0
+        if rewards is not None:
+            cumulative_rewards = tf.reduce_mean(
+                tf.cumsum(rewards, axis=1, reverse=True),
+                axis=0)
+            _scalar_summary("total_reward", cumulative_rewards[0])
+            if hparams.use_control_variates:
+                # Subtract a mean of rewards to decrease variance.
+                control_variate = tf.reduce_mean(cumulative_rewards)
+                if hparams.control_variates_ema_decay > 0:
+                    # Use a rolling average of the cumulative rewards.
+                    control_variate = self._ema(control_variate)
+                _scalar_summary("reward_control_variate", control_variate)
+                cumulative_rewards -= control_variate
+            # Recompute the log-probs with gradient only going to the
+            # agent via the contexts.
+            log_probs_stopgrad = self._vae.log_prob_observed(
+                contexts,
+                snt.nest.map(tf.stop_gradient, latents),
+                snt.nest.map(tf.stop_gradient, observed))
+            # Don't try to increase the reward directly.
+            cumulative_rewards_stopgrad = tf.stop_gradient(cumulative_rewards)
+            reinforce_loss = _sum_time_average_batch(
+                -cumulative_rewards_stopgrad * log_probs_stopgrad)
+        _scalar_summary("reinforce_loss", reinforce_loss)
+
+        loss = elbo_loss + reinforce_loss
+        _scalar_summary("loss", loss)
         train_op = tf.contrib.training.create_train_op(
             loss,
             self._optimizer,
+            transform_grads_fn=self._transform_gradients,
             summarize_gradients=True,
             check_numerics=hparams.check_numerics)
-
-        debug_tensors = dict(
-            log_prob=log_prob,
-            divergence=divergence,
-            elbo=elbo,
-            loss=loss)
         return train_op, debug_tensors
+
+
+class ExponentialMovingAverage(snt.AbstractModule):
+    """Simple replacement for tf.train.ExponentialMovingAverage for Sonnet."""
+
+    def __init__(self, name=None):
+        super(ExponentialMovingAverage, self).__init__(name=name)
+
+    def _build(self, value, decay=0.99):
+        avg = tf.get_local_variable(
+            name=self.module_name + "_avg",
+            shape=value.get_shape(),
+            dtype=value.dtype,
+            initializer=tf.zeros_initializer())
+        delta = (avg - value) * decay
+        return tf.assign_sub(avg, delta)

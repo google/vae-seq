@@ -43,8 +43,7 @@ class DistCore(DistModule):
             dist_arg, state_arg = self(input_, state)
             dist = self.dist(dist_arg)
             event = dist.sample()
-            event.set_shape(
-                tf.TensorShape([None]).concatenate(dist.event_shape))
+            util.set_tensor_shapes(event, dist.event_shape, add_batch_dim=True)
             state = self._next_state(state_arg, event)
             return event, state
         return util.WrapRNNCore(

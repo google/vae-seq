@@ -66,7 +66,7 @@ class VAEBase(snt.AbstractModule):
 
     def log_prob_observed(self, contexts, latents, observed):
         """Evaluates log probabilities of a sequence of observations."""
-        batch_size = tf.shape(observed)[0]
+        batch_size = util.batch_size_from_nested_tensors(observed)
         cell = self.observed_distcore.log_probs
         initial_state = cell.initial_state(batch_size)
         inputs = ((contexts, latents), observed)
