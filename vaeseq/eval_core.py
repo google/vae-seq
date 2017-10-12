@@ -97,9 +97,9 @@ class EvalCoreFromContexts(snt.RNNCore):
     def _build(self, context_obs, state):
         context, obs = context_obs
         latent_state, obs_state = state
-        latent, latent_state = self._latent_distcore.samples(
+        latent, latent_state = self._latent_distcore.next_sample(
             context, latent_state)
-        output, obs_state = self._obs_distcore.log_probs(
+        output, obs_state = self._obs_distcore.next_log_prob(
             ((context, latent), obs), obs_state)
         state = (latent_state, obs_state)
         return output, state

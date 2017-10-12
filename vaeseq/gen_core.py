@@ -55,9 +55,9 @@ class GenCore(snt.RNNCore):
     def _build(self, input_, state):
         agent_state, latent_state, obs_state = state
         context = self.agent.context(input_, agent_state)
-        latent, latent_state = self._latent_distcore.samples(
+        latent, latent_state = self._latent_distcore.next_sample(
             context, latent_state)
-        obs, obs_state = self._obs_distcore.samples(
+        obs, obs_state = self._obs_distcore.next_sample(
             (context, latent), obs_state)
         output = (obs, latent, agent_state)
         agent_state = self.agent.observe(input_, obs, agent_state)
