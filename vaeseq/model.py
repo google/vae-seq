@@ -20,6 +20,8 @@ class ModelBase(object):
         self._session_params = session_params
         with tf.name_scope("vae"):
             self._vae = self._make_vae()
+        self._agent_loss = self._make_agent_loss()
+        self._elbo_loss = self._make_elbo_loss()
         self._trainer = train_mod.Trainer(self.hparams, self.vae)
 
 
@@ -102,9 +104,18 @@ class ModelBase(object):
         """Trains/continues training the model."""
         global_step = tf.train.get_or_create_global_step()
         contexts, observed = self._open_dataset(dataset)
-        train_op, debug_tensors = self._trainer(
-            contexts, observed,
-            rewards=self.vae.agent.rewards(observed))
+        batch_size = util.batch_size_from_nested_tensors(observed)
+        sequence_size = util.sequence_size_from_nested_tensors(observed)
+        elbo_loss, debug_tensors = self._elbo_loss(contexts, observed)
+        agent_loss = None
+        generated = None
+        if self._agent_loss is not None:
+            generated, log_prob_gen = self.vae.gen_log_probs_core.generate(
+                    self.vae.agent.get_inputs(batch_size, sequence_size))[0]
+            agent_loss, agent_debug_tensors = self._agent_loss(
+                generated, log_prob_gen)
+            debug_tensors.update(agent_debug_tensors)
+        train_op = self._trainer(elbo_loss, agent_loss=agent_loss)
         debug_tensors["global_step"] = global_step
 
         hooks = [tf.train.LoggingTensorHook(debug_tensors, every_n_secs=60.)]
@@ -131,10 +142,9 @@ class ModelBase(object):
                 summary_op=tf.summary.merge(slow_summaries)))
 
             # Add sample generated sequences.
-            batch_size = util.batch_size_from_nested_tensors(observed)
-            sequence_size = util.sequence_size_from_nested_tensors(observed)
-            generated = self.vae.gen_core.generate(
-                self.vae.agent.get_inputs(batch_size, sequence_size))[0]
+            if generated is None:
+                generated = self.vae.gen_core.generate(
+                    self.vae.agent.get_inputs(batch_size, sequence_size))[0]
             hooks.append(tf.train.SummarySaverHook(
                 save_steps=1000,
                 output_dir=self._session_params.log_dir,
@@ -176,6 +186,14 @@ class ModelBase(object):
     def _render(self, observed):
         """Returns a rendering of the modeled observation for output."""
         return observed
+
+    def _make_elbo_loss(self):
+        """Returns a (contexts, observed) -> (loss, debug_tensors) map."""
+        return train_mod.ELBOLoss(self.hparams, self.vae)
+
+    def _make_agent_loss(self):
+        """Returns a (observed, log_probs) -> (loss, debug_tensors) map."""
+        return None
 
     @abc.abstractmethod
     def _make_vae(self):

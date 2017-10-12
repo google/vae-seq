@@ -60,6 +60,7 @@ py_library(
         ":codec",
         ":environment",
         "//vaeseq:model",
+        "//vaeseq:train",
         "//vaeseq:util",
         "//vaeseq/vae",
     ],

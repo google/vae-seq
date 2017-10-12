@@ -29,8 +29,6 @@ _DEFAULTS = dict(
     sequence_size=5,
     learning_rate=0.0001,
     clip_gradient_norm=1.,
-    use_control_variates=True,
-    control_variates_ema_decay=0.99,
     check_numerics=True,
 )
 

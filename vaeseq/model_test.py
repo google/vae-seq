@@ -38,7 +38,7 @@ class ModelTest(tf.test.TestCase):
         eval_debug1 = self._evaluate()
         train_debug2 = self._train()
         eval_debug2 = self._evaluate()
-        self.assertLess(train_debug2["loss"], train_debug1["loss"])
+        self.assertLess(train_debug2["elbo_loss"], train_debug1["elbo_loss"])
         self.assertGreater(eval_debug2["log_prob"], eval_debug1["log_prob"])
 
     def test_genaration(self):

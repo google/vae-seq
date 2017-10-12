@@ -11,7 +11,8 @@ from . import util
 class GenCore(snt.RNNCore):
     """An RNNCore that generates sequences of observed and latent variables."""
 
-    def __init__(self, agent, latent_distcore, obs_distcore, name=None):
+    def __init__(self, agent, latent_distcore, obs_distcore,
+                 with_obs_log_probs=False, name=None):
         super(GenCore, self).__init__(name=name)
         assert isinstance(agent, agent_mod.Agent)
         assert isinstance(latent_distcore, dist_module.DistCore)
@@ -19,6 +20,7 @@ class GenCore(snt.RNNCore):
         self._agent = agent
         self._latent_distcore = latent_distcore
         self._obs_distcore = obs_distcore
+        self._with_obs_log_probs = with_obs_log_probs
 
     @property
     def agent(self):
@@ -41,14 +43,20 @@ class GenCore(snt.RNNCore):
     @property
     def output_size(self):
         """Sizes of output tensors."""
-        return (self._obs_distcore.event_size,     # sampled observations
+        obs_event_size = self._obs_distcore.event_size
+        if self._with_obs_log_probs:
+            obs_event_size = (obs_event_size, tf.TensorShape([]))
+        return (obs_event_size,  # sampled observations (and log-probs)
                 self._latent_distcore.event_size,  # sampled latents
                 self.agent.state_size,)            # agent states
 
     @property
     def output_dtype(self):
         """Types of output tensors."""
-        return (self._obs_distcore.event_dtype,
+        obs_event_dtype = self._obs_distcore.event_dtype
+        if self._with_obs_log_probs:
+            obs_event_dtype = (obs_event_dtype, tf.float32)
+        return (obs_event_dtype,
                 self._latent_distcore.event_dtype,
                 self.agent.state_dtype)
 
@@ -58,9 +66,11 @@ class GenCore(snt.RNNCore):
         latent, latent_state = self._latent_distcore.next_sample(
             context, latent_state)
         obs, obs_state = self._obs_distcore.next_sample(
-            (context, latent), obs_state)
+            (context, latent), obs_state,
+            with_log_prob=self._with_obs_log_probs)
         output = (obs, latent, agent_state)
-        agent_state = self.agent.observe(input_, obs, agent_state)
+        obs_no_log_prob = obs[0] if self._with_obs_log_probs else obs
+        agent_state = self.agent.observe(input_, obs_no_log_prob, agent_state)
         state = (agent_state, latent_state, obs_state)
         return output, state
 
