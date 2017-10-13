@@ -27,10 +27,6 @@ class DistModule(snt.AbstractModule):
 class DistCore(DistModule):
     """Like an RNNCore, but outputs distributions."""
 
-    def __init__(self, name=None):
-        super(DistCore, self).__init__(name=name)
-        self._cores = {}
-
     @abc.abstractproperty
     def state_size(self):
         """Returns the non-batched sizes of Tensors returned from next_state."""
@@ -59,36 +55,30 @@ class DistCore(DistModule):
         state = self._next_state(state_arg, observed)
         return dist.log_prob(observed), state
 
-    def _cached_core(self, name, step, output_size):
-        """Creates or retrieves a cached RNNCore."""
-        if name not in self._cores:
-            self._cores[name] = util.WrapRNNCore(
-                step,
-                self.state_size,
-                output_size,
-                name=self.module_name + "/" + name)
-        return self._cores[name]
-
-    @property
+    @util.lazy_property
     def samples(self):
         """Returns an RNNCore that produces a sequence of samples."""
-        return self._cached_core(
-            "samples",
+        return util.WrapRNNCore(
             functools.partial(self.next_sample, with_log_prob=False),
-            self.event_size)
+            self.state_size,
+            output_size=self.event_size,
+            name=self.module_name + "/samples")
 
-    @property
+
+    @util.lazy_property
     def samples_with_log_probs(self):
         """Returns an RNNCore that produces (sample, log-prob(sample))."""
-        return self._cached_core(
-            "samples_with_log_probs",
+        return util.WrapRNNCore(
             functools.partial(self.next_sample, with_log_prob=True),
-            (self.event_size, tf.TensorShape([])))
+            self.state_size,
+            output_size=(self.event_size, tf.TensorShape([])),
+            name=self.module_name + "/samples_with_log_probs")
 
-    @property
+    @util.lazy_property
     def log_probs(self):
         """Returns an RNNCore that evaluates the log-prob of the input."""
-        return self._cached_core(
-            "log_probs",
+        return util.WrapRNNCore(
             self.next_log_prob,
-            tf.TensorShape([]))
+            self.state_size,
+            output_size=tf.TensorShape([]),
+            name=self.module_name + "/log_probs")

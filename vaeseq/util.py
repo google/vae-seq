@@ -1,5 +1,6 @@
 """Utilities used elsewhere in this library."""
 
+import functools
 import sonnet as snt
 import tensorflow as tf
 from tensorflow.contrib import distributions
@@ -215,3 +216,17 @@ def set_tensor_shapes(tensors, shapes, add_batch_dim=False):
             shapes)
     snt.nest.map(lambda tensor, shape: tensor.set_shape(shape),
                  tensors, shapes)
+
+
+def lazy_property(fn):
+    """A property decorator that caches the returned value."""
+    key = fn.__name__ + "_cache_val_"
+
+    @functools.wraps(fn)
+    def _lazy(self):
+        """Very simple cache."""
+        if not hasattr(self, key):
+            setattr(self, key, fn(self))
+        return getattr(self, key)
+
+    return property(_lazy)

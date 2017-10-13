@@ -17,7 +17,6 @@ class VAEBase(snt.AbstractModule):
         self._agent = agent
         self._latent_prior_distcore = None
         self._observed_distcore = None
-        self._cores = {}
         with self._enter_variable_scope():
             self._init_submodules()
             assert self._latent_prior_distcore is not None
@@ -34,38 +33,30 @@ class VAEBase(snt.AbstractModule):
     def _build(self, *args, **kwargs):
         raise NotImplementedError("Please use member methods.")
 
-    def _cached_core(self, name, cls, *args, **kwargs):
-        """Creates or retrieves a cached RNNCore."""
-        if name not in self._cores:
-            with self._enter_variable_scope():
-                self._cores[name] = cls(*args, name=name, **kwargs)
-        return self._cores[name]
-
-    @property
+    @util.lazy_property
     def eval_core(self):
         """An RNNCore is used to calculate log-probabilities of observations."""
-        return self._cached_core("eval_core", eval_core.EvalCore,
-                                 self.agent,
-                                 self._latent_prior_distcore,
-                                 self._observed_distcore)
+        return eval_core.EvalCore(self.agent,
+                                  self._latent_prior_distcore,
+                                  self._observed_distcore)
 
-    @property
+    @util.lazy_property
     def gen_core(self):
         """A RNNCore is used to sample sequences."""
-        return self._cached_core("gen_core", gen_core.GenCore,
-                                 self.agent,
-                                 self._latent_prior_distcore,
-                                 self._observed_distcore,
-                                 with_obs_log_probs=False)
+        return gen_core.GenCore(self.agent,
+                                self._latent_prior_distcore,
+                                self._observed_distcore,
+                                with_obs_log_probs=False,
+                                name="gen_core")
 
-    @property
+    @util.lazy_property
     def gen_log_probs_core(self):
         """A RNNCore is used to sample sequences."""
-        return self._cached_core("gen_log_probs_core", gen_core.GenCore,
-                                 self.agent,
-                                 self._latent_prior_distcore,
-                                 self._observed_distcore,
-                                 with_obs_log_probs=True)
+        return gen_core.GenCore(self.agent,
+                                self._latent_prior_distcore,
+                                self._observed_distcore,
+                                with_obs_log_probs=True,
+                                name="gen_log_probs_core")
 
     @property
     def agent(self):

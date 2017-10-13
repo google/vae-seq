@@ -53,9 +53,15 @@ class ModelBase(object):
     def hparams(self):
         return self._hparams
 
-    @property
+    @util.lazy_property
     def vae(self):
-        return self._vae
+        with tf.name_scope("vae"):
+            return self._make_vae()
+
+    @util.lazy_property
+    def trainer(self):
+        return train_mod.Trainer(self.hparams, self.vae)
+
 
     def training_session(self, hooks=None):
         scaffold = self._make_scaffold()
