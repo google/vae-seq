@@ -48,7 +48,7 @@ class TrainableAgent(agent_mod.Agent):
                                   tf.TensorShape(size).as_list()),
             self.state_size)
 
-    def agent_variables(self):
+    def get_variables(self):
         if self._agent_variables is None:
             raise ValueError("Agent variables haven't been constructed yet.")
         return self._agent_variables

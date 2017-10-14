@@ -18,12 +18,6 @@ class ModelBase(object):
     def __init__(self, hparams, session_params):
         self._hparams = hparams
         self._session_params = session_params
-        with tf.name_scope("vae"):
-            self._vae = self._make_vae()
-        self._agent_loss = self._make_agent_loss()
-        self._elbo_loss = self._make_elbo_loss()
-        self._trainer = train_mod.Trainer(self.hparams, self.vae)
-
 
     class SessionParams(object):
         """Utility class for commonly used session parameters."""
@@ -60,8 +54,8 @@ class ModelBase(object):
 
     @util.lazy_property
     def trainer(self):
-        return train_mod.Trainer(self.hparams, self.vae)
-
+        return train_mod.Trainer(self.hparams, self.vae,
+                                 tf.train.get_or_create_global_step())
 
     def training_session(self, hooks=None):
         scaffold = self._make_scaffold()
@@ -108,23 +102,10 @@ class ModelBase(object):
 
     def train(self, dataset, num_steps, valid_dataset=None):
         """Trains/continues training the model."""
-        global_step = tf.train.get_or_create_global_step()
         contexts, observed = self._open_dataset(dataset)
-        batch_size = util.batch_size_from_nested_tensors(observed)
-        sequence_size = util.sequence_size_from_nested_tensors(observed)
-        elbo_loss, debug_tensors = self._elbo_loss(contexts, observed)
-        agent_loss = None
-        generated = None
-        if self._agent_loss is not None:
-            generated, log_prob_gen = self.vae.gen_log_probs_core.generate(
-                    self.vae.agent.get_inputs(batch_size, sequence_size))[0]
-            agent_loss, agent_debug_tensors = self._agent_loss(
-                generated, log_prob_gen)
-            debug_tensors.update(agent_debug_tensors)
-        train_op = self._trainer(elbo_loss, agent_loss=agent_loss)
-        debug_tensors["global_step"] = global_step
+        train_op, debug = self.trainer(contexts, observed)
 
-        hooks = [tf.train.LoggingTensorHook(debug_tensors, every_n_secs=60.)]
+        hooks = [tf.train.LoggingTensorHook(debug, every_n_secs=60.)]
         if self._session_params.log_dir:
             # Add metric summaries to be computed at a slower rate.
             slow_summaries = []
@@ -148,9 +129,10 @@ class ModelBase(object):
                 summary_op=tf.summary.merge(slow_summaries)))
 
             # Add sample generated sequences.
-            if generated is None:
-                generated = self.vae.gen_core.generate(
-                    self.vae.agent.get_inputs(batch_size, sequence_size))[0]
+            batch_size = util.batch_size_from_nested_tensors(observed)
+            sequence_size = util.sequence_size_from_nested_tensors(observed)
+            generated = self.vae.gen_core.generate(
+                self.vae.agent.get_inputs(batch_size, sequence_size))[0]
             hooks.append(tf.train.SummarySaverHook(
                 save_steps=1000,
                 output_dir=self._session_params.log_dir,
@@ -159,17 +141,16 @@ class ModelBase(object):
                     self._make_output_summary("generated", generated),
                 ])))
 
+        debug_vals = None
         with self.training_session(hooks=hooks) as sess:
-            for _ in range(num_steps - 1):
+            for local_step in range(num_steps):
                 if sess.should_stop():
                     break
-                sess.run(train_op)
-            if not sess.should_stop():
-                debug_tensors["train_op"] = train_op
-                ret = sess.run(debug_tensors)
-                del ret["train_op"]
-                return ret
-        return None
+                if local_step < num_steps - 1:
+                    sess.run(train_op)
+                else:
+                    _, debug_vals = sess.run((train_op, debug))
+        return debug_vals
 
     def generate(self):
         """Generates sequences from a trained model."""

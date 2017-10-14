@@ -28,8 +28,10 @@ _DEFAULTS = dict(
     batch_size=20,
     sequence_size=5,
     learning_rate=0.0001,
+    agent_learning_rate=0.01 * 0.0001,
     clip_gradient_norm=1.,
     check_numerics=True,
+    reinforce_agent_across_timesteps=True,
 )
 
 def make_hparams(flag_value=None, **kwargs):

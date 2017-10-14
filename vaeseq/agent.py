@@ -46,7 +46,7 @@ class Agent(snt.AbstractModule):
         # Default to providing the context.
         return self.context(agent_input, state)
 
-    def agent_variables(self):
+    def get_variables(self):
         """Returns the variables to update during RL."""
         return None
 

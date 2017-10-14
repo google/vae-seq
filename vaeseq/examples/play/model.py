@@ -6,7 +6,6 @@ import numpy as np
 import tensorflow as tf
 
 from vaeseq import model as model_mod
-from vaeseq import train as train_mod
 from vaeseq import util
 from vaeseq import vae as vae_mod
 
@@ -35,11 +34,6 @@ class Model(model_mod.ModelBase):
             self._env,
             agent.get_inputs(util.batch_size(self.hparams),
                              util.sequence_size(self.hparams)))
-
-    def _make_agent_loss(self):
-        if self.hparams.train_agent:
-            return train_mod.AgentLoss(self.hparams, self.vae)
-        return None
 
     def _make_output_summary(self, tag, observed):
         return tf.summary.scalar(
