@@ -19,8 +19,9 @@ _DEFAULTS = dict(
     positive_projection='softplus',
 
     # VAE params
-    divergence_strength_halfway_point=1e4,  # global steps.
-    vae_type='SRNN',  # See vae.VAE_TYPES.
+    divergence_strength_start=1e-5,  # scale on divergence penalty.
+    divergence_strength_half=1e5,  # in global-steps.
+    vae_type='SRNN',  # see vae.VAE_TYPES.
     use_monte_carlo_kl=False,
     srnn_use_res_q=True,
 

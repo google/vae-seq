@@ -2,6 +2,7 @@
 
 import abc
 import functools
+import numpy as np
 import sonnet as snt
 import tensorflow as tf
 
@@ -207,9 +208,12 @@ class ELBOLoss(snt.AbstractModule):
         scalar_summary("ELBO", log_prob - divergence)
 
         # We soften the divergence penalty at the start of training.
-        divergence_strength = tf.sigmoid(
-            tf.to_float(tf.train.get_or_create_global_step()) /
-            self._hparams.divergence_strength_halfway_point - 1.)
+        temp_start = -np.log(self._hparams.divergence_strength_start)
+        temp_decay = ((-np.log(0.5) / temp_start) **
+                      (1. / self._hparams.divergence_strength_half))
+        global_step = tf.to_double(tf.train.get_or_create_global_step())
+        divergence_strength = tf.to_float(
+            tf.exp(-temp_start * tf.pow(temp_decay, global_step)))
         scalar_summary("divergence_strength", divergence_strength)
         relaxed_elbo = log_prob - divergence * divergence_strength
 
