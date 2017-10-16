@@ -39,12 +39,11 @@ class RNN(base.VAEBase):
         self._observed_distcore = ObsDist(self._d_core, self._obs_decoder)
 
     def infer_latents(self, contexts, observed):
+        del contexts  # Not used.
         batch_size = util.batch_size_from_nested_tensors(observed)
         sequence_size = util.sequence_size_from_nested_tensors(observed)
         latents = tf.zeros([batch_size, sequence_size, 0])
         divs = tf.zeros([batch_size, sequence_size])
-        latents.set_shape(observed.get_shape()[:2].concatenate([0]))
-        divs.set_shape(observed.get_shape()[:2])
         return latents, divs
 
 
