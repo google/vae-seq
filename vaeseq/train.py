@@ -97,18 +97,21 @@ class AgentTrainer(TrainerBaseWithOptimizer):
         return [var for var in trainable_vars if var in agent_vars]
 
     def _apply_loss(self, contexts, observed):
-        # We only check whether the agent knows how to extract
-        # observation rewards here. Otherwise, we train on the
-        # generated environment.
-        del contexts  # Not used.
         agent = self._vae.agent
         observed_rewards = agent.rewards(observed)
         if observed_rewards is None:
             return 0., {}
-        inputs = agent.get_inputs(util.batch_size(self._hparams),
-                                  util.sequence_size(self._hparams))
-        generated, log_probs = self._vae.gen_log_probs_core.generate(inputs)[0]
-        return AgentLoss(self._hparams, agent)(generated, log_probs)
+
+        loss_fn = AgentLoss(self._hparams, agent)
+        if self._hparams.train_agent_from_model:
+            del contexts  # Not used.
+            generated, log_probs = self._vae.gen_log_probs_core.generate(
+                agent.get_inputs(util.batch_size(self._hparams),
+                                 util.sequence_size(self._hparams)))[0]
+            return loss_fn(generated, log_probs)
+        latents, _unused_divs = self._vae.infer_latents(contexts, observed)
+        log_probs = self._vae.log_prob_observed(contexts, latents, observed)
+        return loss_fn(observed, log_probs)
 
 
 class VAETrainer(TrainerBaseWithOptimizer):
@@ -167,19 +170,21 @@ class AgentLoss(snt.AbstractModule):
         rewards = self._agent.rewards(observed)
         assert rewards is not None
 
-        # Apply batch normalization to the rewards to simplify training.
-        batch_norm = snt.BatchNorm(axis=[0, 1])
-        rewards = batch_norm(rewards, is_training=True)
-        scalar_summary("mean_reward", tf.squeeze(batch_norm.moving_mean))
-        loss = -_sum_time_average_batch(rewards)
+        mean_reward = tf.reduce_mean(rewards)
+        scalar_summary("mean_reward", mean_reward)
+        loss = -mean_reward
 
         if self._hparams.reinforce_agent_across_timesteps:
             # Since observations are fed back into the following
             # timesteps, propagate gradient across observations using the
             # log-derivative trick (REINFORCE).
-            cumulative_rewards = tf.cumsum(rewards, axis=1, reverse=True)
+            cumulative_rewards = tf.reverse(
+                tf.scan(
+                    lambda acc, x: self._hparams.reward_decay * acc + x,
+                    tf.reverse(rewards, axis=[-1])),
+                axis=[-1])
             proxy_rewards = log_probs * tf.stop_gradient(cumulative_rewards)
-            mean_proxy_reward = _sum_time_average_batch(proxy_rewards)
+            mean_proxy_reward = tf.reduce_mean(proxy_rewards)
             scalar_summary("mean_proxy_reward", mean_proxy_reward)
             loss -= mean_proxy_reward
 
@@ -201,8 +206,8 @@ class ELBOLoss(snt.AbstractModule):
 
         latents, divs = self._vae.infer_latents(contexts, observed)
         log_probs = self._vae.log_prob_observed(contexts, latents, observed)
-        log_prob = _sum_time_average_batch(log_probs)
-        divergence = _sum_time_average_batch(divs)
+        log_prob = tf.reduce_mean(log_probs)
+        divergence = tf.reduce_mean(divs)
         scalar_summary("log_prob", log_prob)
         scalar_summary("divergence", divergence)
         scalar_summary("ELBO", log_prob - divergence)
@@ -227,8 +232,3 @@ def _scalar_summary(debug_tensors, name, tensor):
     tensor = tf.convert_to_tensor(tensor, name=name)
     debug_tensors[name] = tensor
     tf.summary.scalar(name, tensor)
-
-
-def _sum_time_average_batch(tensor):
-    """Sum across time and average over batch entries."""
-    return tf.reduce_mean(tf.reduce_sum(tensor, axis=1), axis=0)

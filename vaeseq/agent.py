@@ -41,10 +41,20 @@ class Agent(snt.AbstractModule):
     def _build(self, *args, **kwargs):
         raise NotImplementedError("Please use member methods.")
 
-    def env_input(self, agent_input, state):
-        """Optional method to generate training data from an environment."""
+    def action(self, agent_input, state):
+        """Optional method for interacting with an environment."""
         # Default to providing the context.
         return self.context(agent_input, state)
+
+    @property
+    def action_dtype(self):
+        """The types of actions."""
+        return self.context_dtype
+
+    @property
+    def action_size(self):
+        """The sizes of the actions."""
+        return self.context_size
 
     def get_variables(self):
         """Returns the variables to update during RL."""
@@ -62,8 +72,7 @@ class Agent(snt.AbstractModule):
         ret.set_shape([None, None, 0])
         return ret
 
-    def contexts_for_static_observations(self, observed,
-                                         agent_inputs=None,
+    def contexts_for_static_observations(self, observed, agent_inputs=None,
                                          initial_state=None):
         """Generate contexts for a static sequence of observations."""
         batch_size = util.batch_size_from_nested_tensors(observed)
@@ -92,10 +101,9 @@ class Agent(snt.AbstractModule):
             output_dtypes=self.context_dtype)
         return contexts
 
-    def contexts_and_observations_from_environment(self, env, agent_inputs,
-                                                   env_initial_state=None,
-                                                   agent_initial_state=None):
-        """Generate contexts and observations from an Environment."""
+    def run_environment(self, env, agent_inputs, env_initial_state=None,
+                        agent_initial_state=None):
+        """Generate contexts, actions, and observations from an Environment."""
         if env_initial_state is None or agent_initial_state is None:
             batch_size = tf.shape(agent_inputs)[0]
             if env_initial_state is None:
@@ -108,22 +116,23 @@ class Agent(snt.AbstractModule):
             """Manipulate the environment and record what happens."""
             agent_state, env_state = state
             context = self.context(agent_input, agent_state)
-            env_input = self.env_input(agent_input, agent_state)
-            obs, env_state = env(env_input, env_state)
+            action = self.action(agent_input, agent_state)
+            obs, env_state = env(action, env_state)
             agent_state = self.observe(agent_input, obs, agent_state)
-            return (context, obs), (agent_state, env_state)
+            return (context, action, obs), (agent_state, env_state)
 
         cell = util.WrapRNNCore(
             _step,
             state_size=(self.state_size, env.state_size),
-            output_size=(self.context_size, env.output_size))
+            output_size=(self.context_size, self.action_size, env.output_size))
+        output_dtype = (self.context_dtype, self.action_dtype, env.output_dtype)
         cell, agent_inputs = util.add_support_for_scalar_rnn_inputs(
             cell, agent_inputs)
-        (contexts, observations), _ = util.heterogeneous_dynamic_rnn(
+        (contexts, actions, observations), _ = util.heterogeneous_dynamic_rnn(
             cell, agent_inputs,
             initial_state=initial_state,
-            output_dtypes=(self.context_dtype, env.output_dtype))
-        return contexts, observations
+            output_dtypes=output_dtype)
+        return contexts, actions, observations
 
 
 class Environment(snt.RNNCore):

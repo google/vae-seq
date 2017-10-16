@@ -3,7 +3,6 @@
 import tensorflow as tf
 
 from vaeseq import agent as agent_mod
-from vaeseq import hparams as hparams_mod
 from vaeseq import codec
 
 
@@ -57,8 +56,7 @@ class AgentTest(tf.test.TestCase):
         env = TestEnvironment(name="test_env")
         agent = _make_agent()
         agent_input = agent.get_inputs(2, 3)
-        ctx, obs = agent.contexts_and_observations_from_environment(
-            env, agent_input)
+        ctx, _unused_actions, obs = agent.run_environment(env, agent_input)
         ctx2 = agent.contexts_for_static_observations(obs, agent_input)
         with self.test_session() as sess:
             vals = sess.run(dict(ctx=ctx, ctx2=ctx2, obs=obs))

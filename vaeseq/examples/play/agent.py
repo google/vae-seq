@@ -16,7 +16,7 @@ class TrainableAgent(agent_mod.Agent):
         super(TrainableAgent, self).__init__(name=name)
         self._hparams = hparams
         self._obs_encoder = obs_encoder
-        self._action_size = tf.TensorShape([self._hparams.game_action_space])
+        self._num_actions = tf.TensorShape([self._hparams.game_action_space])
         self._agent_variables = None
         with self._enter_variable_scope():
             self._policy_rnn = util.make_rnn(hparams, name="policy_rnn")
@@ -25,7 +25,7 @@ class TrainableAgent(agent_mod.Agent):
 
     @property
     def context_size(self):
-        return (self._action_size,
+        return (self._num_actions,
                 self._obs_encoder.output_size)
 
     @property
@@ -34,13 +34,15 @@ class TrainableAgent(agent_mod.Agent):
 
     @property
     def state_size(self):
-        return (self._policy_rnn.state_size,
-                self._action_size,
-                self._obs_encoder.output_size)
+        return dict(policy=self._policy_rnn.state_size,
+                    action_logits=self._num_actions,
+                    obs_enc=self._obs_encoder.output_size)
 
     @property
     def state_dtype(self):
-        return (tf.float32, tf.float32, tf.float32)
+        return dict(policy=tf.float32,
+                    action_logits=tf.float32,
+                    obs_enc=tf.float32)
 
     def initial_state(self, batch_size):
         return snt.nest.map(
@@ -61,16 +63,29 @@ class TrainableAgent(agent_mod.Agent):
     def observe(self, agent_input, observation, state):
         del agent_input  # Unused.
         obs_enc = self._obs_encoder(observation)
-        rnn_state = state[0]
+        rnn_state = state["policy"]
         hidden, rnn_state = self._policy_rnn(obs_enc, rnn_state)
         action_logits = self._project_act(hidden)
         self._agent_variables = (self._policy_rnn.get_variables(),
                                  self._project_act.get_variables())
-        return (rnn_state, action_logits, obs_enc)
+        return dict(policy=rnn_state,
+                    action_logits=action_logits,
+                    obs_enc=obs_enc)
 
     def context(self, agent_input, state):
         del agent_input  # Unused.
-        return (state[1], state[2])
+        return (tf.nn.softmax(state["action_logits"]),
+                state["obs_enc"])
 
-    def env_input(self, agent_input, state):
-        return tf.distributions.Categorical(logits=state[1]).sample()
+    @property
+    def action_size(self):
+        return tf.TensorShape([])
+
+    @property
+    def action_dtype(self):
+        return tf.int32
+
+    def action(self, agent_input, state):
+        dist = tf.distributions.Categorical(logits=state["action_logits"],
+                                            dtype=self.action_dtype)
+        return dist.sample()

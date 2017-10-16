@@ -24,15 +24,19 @@ _DEFAULTS = dict(
     vae_type='SRNN',  # see vae.VAE_TYPES.
     use_monte_carlo_kl=False,
     srnn_use_res_q=True,
+    learning_rate=0.0001,
+
+    # Agent params
+    reinforce_agent_across_timesteps=True,
+    train_agent_from_model=False,
+    reward_decay=0.9,
+    agent_learning_rate=0.0001,
 
     # Training parameters
     batch_size=20,
     sequence_size=5,
-    learning_rate=0.0001,
-    agent_learning_rate=0.01 * 0.0001,
     clip_gradient_norm=1.,
     check_numerics=True,
-    reinforce_agent_across_timesteps=True,
 )
 
 def make_hparams(flag_value=None, **kwargs):

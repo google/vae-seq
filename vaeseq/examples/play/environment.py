@@ -65,7 +65,7 @@ class Environment(agent_mod.Environment):
             """Take a step in a single game."""
             score = np.zeros(len(state), dtype=np.float32)
             output = np.zeros([len(state)] + self._hparams.game_output_size,
-                           dtype=np.float32)
+                              dtype=np.float32)
             for i in np.nonzero(state)[0]:
                 game = self._games[state[i]]
                 output[i], score[i], game_over, _ = game.step(actions[i])

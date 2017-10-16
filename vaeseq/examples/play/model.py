@@ -30,13 +30,15 @@ class Model(model_mod.ModelBase):
     def _open_dataset(self, dataset):
         del dataset  #  Not used.
         agent = self.vae.agent
-        return agent.contexts_and_observations_from_environment(
+        contexts, actions, observed = agent.run_environment(
             self._env,
             agent.get_inputs(util.batch_size(self.hparams),
                              util.sequence_size(self.hparams)))
+        tf.summary.histogram("actions", actions)
+        return contexts, observed
 
     def _make_output_summary(self, tag, observed):
         return tf.summary.scalar(
             tag + "/score",
-            tf.reduce_sum(observed["score"]),
+            tf.reduce_mean(tf.reduce_sum(observed["score"], axis=1), axis=0),
             collections=[])

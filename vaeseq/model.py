@@ -102,7 +102,8 @@ class ModelBase(object):
 
     def train(self, dataset, num_steps, valid_dataset=None):
         """Trains/continues training the model."""
-        contexts, observed = self._open_dataset(dataset)
+        with tf.name_scope("train"):
+            contexts, observed = self._open_dataset(dataset)
         train_op, debug = self.trainer(contexts, observed)
 
         hooks = [tf.train.LoggingTensorHook(debug, every_n_secs=60.)]
@@ -121,7 +122,8 @@ class ModelBase(object):
                                               mean, collections=[]))
             _add_to_slow_summaries("train_eval", contexts, observed)
             if valid_dataset is not None:
-                vcontexts, vobserved = self._open_dataset(valid_dataset)
+                with tf.name_scope("valid"):
+                    vcontexts, vobserved = self._open_dataset(valid_dataset)
                 _add_to_slow_summaries("valid_eval", vcontexts, vobserved)
             hooks.append(tf.train.SummarySaverHook(
                 save_steps=100,
