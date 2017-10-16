@@ -5,8 +5,10 @@ from vaeseq import hparams as hparams_mod
 _DEFAULTS = dict(
     latent_size=16,
     sequence_size=40,
-    obs_encoder_fc_layers=[64, 32],
-    obs_decoder_fc_hidden_layers=[64],
+    obs_encoder_fc_layers=[32, 32],
+    obs_decoder_fc_hidden_layers=[32],
+    latent_decoder_fc_layers=[32],
+    rnn_hidden_sizes=[32],
     game="CartPole-v0",
     game_output_size=[4],
     game_action_space=2,
