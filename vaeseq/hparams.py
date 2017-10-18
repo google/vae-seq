@@ -29,7 +29,6 @@ _DEFAULTS = dict(
     # Agent params
     reinforce_agent_across_timesteps=True,
     train_agent_from_model=False,
-    reward_decay=0.9,
     agent_learning_rate=0.0001,
 
     # Training parameters

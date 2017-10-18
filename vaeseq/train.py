@@ -178,11 +178,7 @@ class AgentLoss(snt.AbstractModule):
             # Since observations are fed back into the following
             # timesteps, propagate gradient across observations using the
             # log-derivative trick (REINFORCE).
-            cumulative_rewards = tf.reverse(
-                tf.scan(
-                    lambda acc, x: self._hparams.reward_decay * acc + x,
-                    tf.reverse(rewards, axis=[-1])),
-                axis=[-1])
+            cumulative_rewards = tf.cumsum(rewards, axis=-1, reverse=True)
             proxy_rewards = log_probs * tf.stop_gradient(cumulative_rewards)
             mean_proxy_reward = tf.reduce_mean(proxy_rewards)
             scalar_summary("mean_proxy_reward", mean_proxy_reward)

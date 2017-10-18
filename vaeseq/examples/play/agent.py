@@ -66,6 +66,11 @@ class TrainableAgent(agent_mod.Agent):
         rnn_state = state["policy"]
         hidden, rnn_state = self._policy_rnn(obs_enc, rnn_state)
         action_logits = self._project_act(hidden)
+        if self._hparams.explore_temp > 0:
+            dist = tf.contrib.distributions.ExpRelaxedOneHotCategorical(
+                self._hparams.explore_temp,
+                logits=action_logits)
+            action_logits = dist.sample()
         self._agent_variables = (self._policy_rnn.get_variables(),
                                  self._project_act.get_variables())
         return dict(policy=rnn_state,

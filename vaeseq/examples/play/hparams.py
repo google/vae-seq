@@ -13,7 +13,7 @@ _DEFAULTS = dict(
     game_output_size=[4],
     game_action_space=2,
     train_agent=True,
-    explore_temp=2.,
+    explore_temp=0.5,
 )
 
 

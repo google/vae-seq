@@ -24,14 +24,12 @@ class Environment(agent_mod.Environment):
     @property
     def output_size(self):
         return dict(output=tf.TensorShape(self._hparams.game_output_size),
-                    score=tf.TensorShape([]),
-                    game_over=tf.TensorShape([]),)
+                    score=tf.TensorShape([]),)
 
     @property
     def output_dtype(self):
         return dict(output=tf.float32,
-                    score=tf.float32,
-                    game_over=tf.bool)
+                    score=tf.float32,)
 
     @property
     def state_size(self):
@@ -72,15 +70,12 @@ class Environment(agent_mod.Environment):
                 if game_over:
                     del self._games[state[i]]
                     state[i] = 0
-            game_over = state == 0
-            return output, score, game_over, state
+            return output, score, state
 
-        output, score, game_over, state = tf.py_func(
+        output, score, state = tf.py_func(
             _step_games, [actions, state],
-            [tf.float32, tf.float32, tf.bool, tf.int64])
-        output = dict(output=output,
-                      score=score,
-                      game_over=game_over)
+            [tf.float32, tf.float32, tf.int64])
+        output = dict(output=output, score=score,)
         # Fix up the inferred shapes.
         util.set_tensor_shapes(output, self.output_size, add_batch_dim=True)
         util.set_tensor_shapes(state, self.state_size, add_batch_dim=True)

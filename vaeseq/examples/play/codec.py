@@ -18,15 +18,11 @@ class ObsDecoder(dist_module.DistModule):
 
     We're modeling three components for each observation:
 
-    * The game outputs, modeled by a mixture of deterministic zeros if
-      the game has already ended, or a diagonal multivariate normal
-      otherwise.
+    * The game outputs modeled by a diagonal multivariate normal.
     * The current score (a Normal distribution).
-    * Whether the has ended (a Bernoulli distribution).
 
-    Note that the "game over" condition in the first component is
-    slightly different from the third component, which states that the
-    game will be over on the next timestep.
+    Both output distributions are reparameterizable, so there is a
+    pathwise derivative w.r.t. their parameters.
     """
 
     def __init__(self, hparams, name=None):
@@ -37,55 +33,34 @@ class ObsDecoder(dist_module.DistModule):
     def event_size(self):
         """The shapes of the observations."""
         return dict(output=tf.TensorShape(self._hparams.game_output_size),
-                    score=tf.TensorShape([]),
-                    game_over=tf.TensorShape([]),)
+                    score=tf.TensorShape([]),)
 
     @property
     def event_dtype(self):
         """The data type of the observations."""
         return dict(output=tf.float32,
-                    score=tf.float32,
-                    game_over=tf.bool)
+                    score=tf.float32)
 
     def dist(self, params, name=None):
         """The output distribution."""
         name = name or self.module_name + "_dist"
         with tf.name_scope(name):
-            params_output, params_score, params_game_over_flag = params
+            params_output, params_score = params
             components = dict(
                 output=self._dist_output(params_output),
-                score=self._dist_score(params_score),
-                game_over=self._dist_game_over_flag(params_game_over_flag))
+                score=self._dist_score(params_score))
         return batch_dist.GroupDistribution(components, name=name)
 
     def _dist_output(self, params):
         """Distribution over the game outputs."""
-        game_over_state, (loc, scale_diag) = params
-        return tf.contrib.distributions.Mixture(
-            cat=tf.distributions.Categorical(
-                logits=game_over_state,
-                name="game_over_state"),
-            components=[
-                tf.contrib.distributions.VectorDeterministic(
-                    tf.zeros_like(loc),
-                    name="game_is_over_output"),
-                tf.contrib.distributions.MultivariateNormalDiag(
-                    loc, scale_diag,
-                    name="game_not_over_output"),
-            ],
-            name="game_output")
+        loc, scale_diag = params
+        return tf.contrib.distributions.MultivariateNormalDiag(
+            loc, scale_diag, name="game_output")
 
     def _dist_score(self, params):
         """Distribution for the game score."""
         loc, scale = params
         return tf.distributions.Normal(loc, scale, name="score")
-
-    def _dist_game_over_flag(self, params):
-        """Distribution for the game over flag."""
-        return tf.distributions.Bernoulli(
-            logits=params,
-            dtype=tf.bool,
-            name="game_over_flag")
 
     def _build(self, inputs):
         hparams = self._hparams
@@ -96,25 +71,8 @@ class ObsDecoder(dist_module.DistModule):
                 hparams.obs_decoder_fc_hidden_layers,
                 activate_final=True),
         ])(inputs)
-
-        # Decide on the game output, if the game hasn't ended.
-        game_output = self._build_game_output(hidden)
-
-        # Decide whether the game has already ended
-        game_over_state = snt.Linear(2, name="game_over_state")(hidden)
-        params_output = (game_over_state, game_output)
-
-        # Below here, include the game_over_state logits in hidden.
-        hidden = util.concat_features([hidden, game_over_state])
-
-        # Decide on the score.
-        params_score = self._build_score(hidden)
-
-        # Decide on whether the game is over (next turn).
-        params_game_over_flag = tf.squeeze(
-            snt.Linear(1, name="game_over_flag")(hidden), axis=-1)
-
-        return params_output, params_score, params_game_over_flag
+        return (self._build_game_output(hidden),
+                self._build_score(hidden))
 
     def _build_game_output(self, hidden):
         """Parameters for the game output prediction."""
@@ -129,4 +87,4 @@ class ObsDecoder(dist_module.DistModule):
         lin = snt.Linear(2, name="score")
         loc, scale_unproj = tf.unstack(lin(hidden), axis=-1)
         scale = util.positive_projection(self._hparams)(scale_unproj)
-        return (loc, scale)
+        return loc, scale
