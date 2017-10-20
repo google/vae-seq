@@ -77,6 +77,6 @@ class Environment(agent_mod.Environment):
             [tf.float32, tf.float32, tf.int64])
         output = dict(output=output, score=score,)
         # Fix up the inferred shapes.
-        util.set_tensor_shapes(output, self.output_size, add_batch_dim=True)
-        util.set_tensor_shapes(state, self.state_size, add_batch_dim=True)
+        util.set_tensor_shapes(output, self.output_size, add_batch_dims=1)
+        util.set_tensor_shapes(state, self.state_size, add_batch_dims=1)
         return output, state

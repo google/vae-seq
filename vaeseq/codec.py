@@ -54,7 +54,7 @@ class FlattenObsEncoder(snt.AbstractModule):
         flatten = snt.BatchFlatten(preserve_dims=1)
         flat_obs = snt.nest.map(lambda obs_i: tf.to_float(flatten(obs_i)), obs)
         ret = util.concat_features(flat_obs)
-        util.set_tensor_shapes(ret, self.output_size, add_batch_dim=True)
+        util.set_tensor_shapes(ret, self.output_size, add_batch_dims=1)
         return ret
 
 

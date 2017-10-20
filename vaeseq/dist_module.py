@@ -41,7 +41,7 @@ class DistCore(DistModule):
         dist_arg, state_arg = self(input_, state)
         dist = self.dist(dist_arg)
         event = dist.sample()
-        util.set_tensor_shapes(event, dist.event_shape, add_batch_dim=True)
+        util.set_tensor_shapes(event, dist.event_shape, add_batch_dims=1)
         state = self._next_state(state_arg, event)
         if with_log_prob:
             return (event, dist.log_prob(event)), state

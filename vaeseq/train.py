@@ -117,6 +117,16 @@ class AgentTrainer(TrainerBaseWithOptimizer):
 class VAETrainer(TrainerBaseWithOptimizer):
     """Trainer for non-Agent variables."""
 
+    @util.lazy_property
+    def replay_buffer(self):
+        with self._enter_variable_scope():
+            return ReplayBuffer(
+                capacity=self._hparams.replay_buffer,
+                types=(self._vae.agent.context_dtype,
+                       self._vae.observed_distcore.event_dtype),
+                sizes=(self._vae.agent.context_size,
+                       self._vae.observed_distcore.event_size))
+
     def _make_optimizer(self):
         return tf.train.AdamOptimizer(self._hparams.learning_rate)
 
@@ -129,7 +139,13 @@ class VAETrainer(TrainerBaseWithOptimizer):
         return [var for var in trainable_vars if var not in agent_vars]
 
     def _apply_loss(self, contexts, observed):
-        return ELBOLoss(self._hparams, self._vae)(contexts, observed)
+        loss_fn = ELBOLoss(self._hparams, self._vae)
+        loss, debug = loss_fn(contexts, observed)
+        if self._hparams.replay_buffer > 0:
+            replay_ctx, replay_obs = self.replay_buffer((contexts, observed))
+            replay_loss, _unused_debug = loss_fn(replay_ctx, replay_obs)
+            loss = 0.5 * (loss + replay_loss)
+        return loss, debug
 
 
 class Trainer(TrainerBase):
@@ -223,8 +239,66 @@ class ELBOLoss(snt.AbstractModule):
         return loss, debug_tensors
 
 
+class ReplayBuffer(snt.AbstractModule):
+    """A simple replay buffer for sequential data."""
+
+    def __init__(self, capacity, types, sizes, name=None):
+        super(ReplayBuffer, self).__init__(name=name)
+        self._capacity = capacity
+        self._types = types
+        self._sizes = sizes
+        self._queue = tf.PriorityQueue(
+            capacity=1 << 30,  # Queueing over capacity causes blocking.
+            types=[tf.string] * len(snt.nest.flatten(self._types)),
+            shapes=[tf.TensorShape([3])] * len(snt.nest.flatten(self._sizes)),
+            name=self.module_name + "/queue")
+
+    def _build(self, next_sample):
+        flat_sample = snt.nest.flatten(next_sample)
+        batch_size = tf.shape(flat_sample[0])[0]
+        priorities = tf.random_uniform(
+            shape=[batch_size], maxval=1 << 62, dtype=tf.int64,
+            name="replay_priorities")
+        enqueue_data = [priorities] + [
+            tf.serialize_many_sparse(_dense_to_sparse(component))
+            for component in flat_sample]
+        enqueue_op = self._queue.enqueue_many(enqueue_data)
+        with tf.control_dependencies([enqueue_op]):
+            over_cap = self._queue.size() - self._capacity
+            def _pop_over_cap():
+                popped = self._queue.dequeue_up_to(over_cap)
+                return tf.group(*snt.nest.flatten(popped))
+            discard_op = tf.cond(over_cap <= 0, tf.no_op, _pop_over_cap)
+        with tf.control_dependencies([discard_op]):
+            replay_data = self._queue.dequeue_up_to(self._queue.size())
+            reenqueue_op = self._queue.enqueue_many(replay_data)
+        with tf.control_dependencies([reenqueue_op]):
+            choose_idxs = tf.random_uniform(
+                [batch_size],
+                maxval=tf.shape(replay_data[0])[0],
+                dtype=tf.int32)
+            replay_serialized = snt.nest.pack_sequence_as(
+                structure=self._types,
+                flat_sequence=[
+                    tf.gather(serialized_component, choose_idxs)
+                    for serialized_component in replay_data[1:]])
+            replay_sparse = snt.nest.map(tf.deserialize_many_sparse,
+                                         replay_serialized, self._types)
+            replay = snt.nest.map(tf.sparse_tensor_to_dense, replay_sparse)
+            util.set_tensor_shapes(replay, self._sizes, add_batch_dims=2)
+            return replay
+
+
 def _scalar_summary(debug_tensors, name, tensor):
     """Add a summary and a debug output tensor."""
     tensor = tf.convert_to_tensor(tensor, name=name)
     debug_tensors[name] = tensor
     tf.summary.scalar(name, tensor)
+
+
+def _dense_to_sparse(tensor):
+    """Represent a dense tensor as a sparse one."""
+    return tf.SparseTensor(
+        indices=tf.where(tf.ones_like(tensor, dtype=tf.bool)),
+        values=tf.reshape(tensor, [-1]),
+        dense_shape=tf.shape(tensor, out_type=tf.int64))

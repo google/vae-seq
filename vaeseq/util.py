@@ -208,12 +208,11 @@ def sequence_size(hparams):
     return dynamic_hparam("sequence_size", hparams.sequence_size)
 
 
-def set_tensor_shapes(tensors, shapes, add_batch_dim=False):
+def set_tensor_shapes(tensors, shapes, add_batch_dims=0):
     """Set static shape information for nested tuples of tensors and shapes."""
-    if add_batch_dim:
-        shapes = snt.nest.map(
-            lambda shape: tf.TensorShape([None]).concatenate(shape),
-            shapes)
+    if add_batch_dims:
+        batch_dims = tf.TensorShape([None] * add_batch_dims)
+        shapes = snt.nest.map(batch_dims.concatenate, shapes)
     snt.nest.map(lambda tensor, shape: tensor.set_shape(shape),
                  tensors, shapes)
 

@@ -25,10 +25,11 @@ _DEFAULTS = dict(
     use_monte_carlo_kl=False,
     srnn_use_res_q=True,
     learning_rate=0.0001,
+    replay_buffer=0,  # Should be greater than batch_size.
 
     # Agent params
-    reinforce_agent_across_timesteps=True,
-    train_agent_from_model=False,
+    reinforce_agent_across_timesteps=False,
+    train_agent_from_model=True,
     agent_learning_rate=0.0001,
 
     # Training parameters
