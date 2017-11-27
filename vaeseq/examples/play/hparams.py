@@ -14,7 +14,6 @@ _DEFAULTS = dict(
     game_action_space=2,
     train_agent=True,
     batch_size=20,
-    replay_buffer=20 * 50,
     explore_temp=0.5,
 )
 

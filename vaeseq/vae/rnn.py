@@ -19,98 +19,49 @@ Notation:
 import tensorflow as tf
 from tensorflow.contrib import distributions
 
-from . import base
-from .. import dist_module
 from .. import util
+from .. import vae_module
 
-class RNN(base.VAEBase):
-    """Implementation of an RNN as a fake sequential VAE."""
+class RNN(vae_module.VAECore):
+    """Implementation of an RNN as a sequential VAE where all latent
+       variables are deterministic."""
 
-    def __init__(self, hparams, agent, obs_encoder, obs_decoder, name=None):
-        self._hparams = hparams
-        self._obs_encoder = obs_encoder
-        self._obs_decoder = obs_decoder
-        super(RNN, self).__init__(agent, name=name)
-
-    def _init_submodules(self):
-        hparams = self._hparams
-        self._d_core = util.make_rnn(hparams, name="d_core")
-        self._latent_prior_distcore = NoLatents(hparams)
-        self._observed_distcore = ObsDist(self._d_core, self._obs_decoder)
-
-    def infer_latents(self, contexts, observed):
-        del contexts  # Not used.
-        batch_size = util.batch_size_from_nested_tensors(observed)
-        sequence_size = util.sequence_size_from_nested_tensors(observed)
-        latents = tf.zeros([batch_size, sequence_size, 0])
-        divs = tf.zeros([batch_size, sequence_size])
-        return latents, divs
-
-
-class ObsDist(dist_module.DistCore):
-    """DistCore for producing p(observation | context, latent)."""
-
-    def __init__(self, d_core, obs_decoder, name=None):
-        super(ObsDist, self).__init__(name=name)
-        self._d_core = d_core
-        self._obs_decoder = obs_decoder
+    def __init__(self, hparams, obs_encoder, obs_decoder, name=None):
+        super(RNN, self).__init__(hparams, obs_encoder, obs_decoder, name)
+        with self._enter_variable_scope():
+            self._d_core = util.make_rnn(hparams, name="d_core")
 
     @property
     def state_size(self):
         return self._d_core.state_size
 
-    @property
-    def event_size(self):
-        return self._obs_decoder.event_size
-
-    @property
-    def event_dtype(self):
-        return self._obs_decoder.event_dtype
-
-    def dist(self, params, name=None):
-        return self._obs_decoder.dist(params, name=name)
-
     def _next_state(self, d_state, event=None):
         del event  # Not used.
         return d_state
 
-    def _build(self, inputs, d_state):
-        context, latent = inputs
-        del latent  # The latent variable is empty (has zero size).
+    def _initial_state(self, batch_size):
+        return self._d_core.initial_state(batch_size)
+
+    def _build(self, context, d_state):
         d_out, d_state = self._d_core(util.concat_features(context), d_state)
         return self._obs_decoder(d_out), d_state
 
+    def infer_latents(self, contexts, observed):
+        """Because the RNN latent state is fully deterministic, there's no
+           need to do two passes over the training data."""
+        batch_size = util.batch_size_from_nested_tensors(observed)
+        sequence_size = util.sequence_size_from_nested_tensors(observed)
+        divs = tf.zeros([batch_size, sequence_size], name="divergences")
+        return None, divs
 
-class NoLatents(dist_module.DistCore):
-    """DistCore that samples an empty latent state."""
-
-    def __init__(self, hparams, name=None):
-        super(NoLatents, self).__init__(name=name)
-        self._hparams = hparams
-
-    @property
-    def state_size(self):
-        return ()
-
-    @property
-    def event_size(self):
-        return tf.TensorShape([0])
-
-    @property
-    def event_dtype(self):
-        return tf.float32
-
-    def dist(self, batch_size, name=None):
-        null_events = tf.zeros([batch_size, 0], dtype=self.event_dtype)
-        null_events.set_shape([None, 0])
-        return tf.contrib.distributions.VectorDeterministic(
-            null_events, name=name or self.module_name + "_dist")
-
-    def _next_state(self, state_arg, event=None):
-        del state_arg  # No state needed.
-        return ()
-
-    def _build(self, context, state):
-        del state  # No state needed.
-        batch_size = util.batch_size_from_nested_tensors(context)
-        return batch_size, ()
+    def really_infer_latents(self, contexts, observed):
+        batch_size = util.batch_size_from_nested_tensors(observed)
+        sequence_size = util.sequence_size_from_nested_tensors(observed)
+        cell = util.state_recording_rnn(self._d_core)
+        outputs_and_states, _ = tf.nn.dynamic_rnn(
+            cell,
+            util.concat_features(contexts),
+            initial_state=cell.initial_state(batch_size))
+        latents = outputs_and_states[1]
+        divs = tf.zeros([batch_size, sequence_size], name="divergences")
+        return latents, divs

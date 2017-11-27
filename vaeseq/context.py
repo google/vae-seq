@@ -174,7 +174,7 @@ class Chain(Context):
 
     @property
     def output_size(self):
-        return self._constexts[-1].output_size
+        return self._contexts[-1].output_size
 
     @property
     def output_dtype(self):

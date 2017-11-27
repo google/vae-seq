@@ -1,23 +1,12 @@
 package(default_visibility = ["//visibility:public"])
 
 py_library(
-    name = "base",
-    srcs = ["base.py"],
-    deps = [
-        "//vaeseq:eval_core",
-        "//vaeseq:gen_core",
-        "//vaeseq:util",
-    ],
-)
-
-py_library(
     name = "independent_sequence",
     srcs = ["independent_sequence.py"],
     deps = [
-        ":base",
-        "//vaeseq:dist_module",
         "//vaeseq:latent",
         "//vaeseq:util",
+        "//vaeseq:vae_module",
     ],
 )
 
@@ -25,9 +14,8 @@ py_library(
     name = "rnn",
     srcs = ["rnn.py"],
     deps = [
-        ":base",
-        "//vaeseq:dist_module",
         "//vaeseq:util",
+        "//vaeseq:vae_module",
     ],
 )
 
@@ -35,10 +23,9 @@ py_library(
     name = "srnn",
     srcs = ["srnn.py"],
     deps = [
-        ":base",
-        "//vaeseq:dist_module",
         "//vaeseq:latent",
         "//vaeseq:util",
+        "//vaeseq:vae_module",
     ],
 )
 
@@ -57,8 +44,8 @@ py_test(
     srcs = ["vae_test.py"],
     deps = [
         ":vae",
-        "//vaeseq:agent",
         "//vaeseq:codec",
+        "//vaeseq:context",
         "//vaeseq:hparams",
         "//vaeseq:util",
     ],

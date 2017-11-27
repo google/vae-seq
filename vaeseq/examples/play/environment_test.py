@@ -13,14 +13,15 @@ class EnvironmentTest(tf.test.TestCase):
         hparams = tf.contrib.training.HParams(
             game="CartPole-v0",
             game_output_size=[4])
-        actions = [[0, 1] * 10,
-                   [1, 1] * 10]
+        left_logits = [-100., 100.]
+        right_logits = [100., -100.]
+        actions = [[left_logits, right_logits] * 10,
+                   [right_logits, left_logits] * 10]
         batch_size = len(actions)
-        actions = tf.constant(actions, dtype=tf.int32)
+        actions = tf.constant(actions, dtype=tf.float32)
         env = env_mod.Environment(hparams)
         initial_state = env.initial_state(batch_size=batch_size)
         output_dtypes = env.output_dtype
-        env, actions = util.add_support_for_scalar_rnn_inputs(env, actions)
         observed, _ = util.heterogeneous_dynamic_rnn(
             env, actions,
             initial_state=initial_state,
@@ -29,10 +30,11 @@ class EnvironmentTest(tf.test.TestCase):
             observed = sess.run(observed)
             outputs = observed["output"]
             game_over = observed["game_over"]
+            print("ZZZ", game_over, observed, outputs)
             scores = observed["score"]
-            self.assertTrue(np.all(scores[~game_over] == 1))
-            nonzero_gameover_scores = scores[np.nonzero(scores[game_over])]
-            nonzero_gameover_outs = outputs[np.nonzero(outputs[game_over])]
+            self.assertTrue(np.all(scores[game_over > 0] == 1))
+            nonzero_gameover_scores = scores[np.nonzero(scores[game_over > 0])]
+            nonzero_gameover_outs = outputs[np.nonzero(outputs[game_over > 0])]
             self.assertLessEqual(len(nonzero_gameover_scores), batch_size)
             self.assertLessEqual(len(nonzero_gameover_outs), batch_size * 4)
 

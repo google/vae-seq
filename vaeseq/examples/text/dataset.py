@@ -41,9 +41,9 @@ def characters(filename, batch_size, sequence_size):
         """string scalar -> Dataset of characters (string scalars)."""
         chars, = tf.py_func(_split_string, [line + "\n"], [tf.string])
         chars.set_shape([None])
-        return tf.contrib.data.Dataset.from_tensor_slices(chars)
+        return tf.data.Dataset.from_tensor_slices(chars)
 
-    return (tf.contrib.data.TextLineDataset([filename])
+    return (tf.data.TextLineDataset([filename])
             .flat_map(_to_chars)
             .repeat()
             .batch(tf.to_int64(sequence_size))

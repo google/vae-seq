@@ -7,11 +7,10 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 
-from vaeseq import agent as agent_mod
 from vaeseq import util
 
 
-class Environment(agent_mod.Environment):
+class Environment(snt.RNNCore):
     """Plays a batch of games."""
 
     def __init__(self, hparams, name=None):
@@ -24,12 +23,14 @@ class Environment(agent_mod.Environment):
     @property
     def output_size(self):
         return dict(output=tf.TensorShape(self._hparams.game_output_size),
-                    score=tf.TensorShape([]),)
+                    score=tf.TensorShape([]),
+                    game_over=tf.TensorShape([]))
 
     @property
     def output_dtype(self):
         return dict(output=tf.float32,
-                    score=tf.float32,)
+                    score=tf.float32,
+                    game_over=tf.float32)
 
     @property
     def state_size(self):
@@ -38,7 +39,7 @@ class Environment(agent_mod.Environment):
 
     @property
     def state_dtype(self):
-        """The state is a game ID, or -1 if the game is over."""
+        """The state is a game ID, or 0 if the game is over."""
         return tf.int64
 
     def initial_state(self, batch_size):
@@ -58,7 +59,9 @@ class Environment(agent_mod.Environment):
         state.set_shape([None])
         return state
 
-    def _build(self, actions, state):
+    def _build(self, input_, state):
+        actions = tf.distributions.Categorical(logits=input_).sample()
+
         def _step_games(actions, state):
             """Take a step in a single game."""
             score = np.zeros(len(state), dtype=np.float32)
@@ -75,7 +78,8 @@ class Environment(agent_mod.Environment):
         output, score, state = tf.py_func(
             _step_games, [actions, state],
             [tf.float32, tf.float32, tf.int64])
-        output = dict(output=output, score=score,)
+        output = dict(output=output, score=score,
+                      game_over=2. * tf.to_float(tf.equal(state, 0)) - 1.)
         # Fix up the inferred shapes.
         util.set_tensor_shapes(output, self.output_size, add_batch_dims=1)
         util.set_tensor_shapes(state, self.state_size, add_batch_dims=1)

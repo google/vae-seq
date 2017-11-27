@@ -16,7 +16,7 @@ py_test(
     name = "dataset_test",
     srcs = ["dataset_test.py"],
     deps = [
-         ":dataset",
+        ":dataset",
     ],
 )
 
@@ -25,7 +25,7 @@ py_library(
     srcs = ["hparams.py"],
     deps = [
         "//vaeseq:hparams",
-    ]
+    ],
 )
 
 py_library(
@@ -33,8 +33,6 @@ py_library(
     srcs = ["model.py"],
     deps = [
         ":dataset",
-        "//vaeseq/vae",
-        "//vaeseq:agent",
         "//vaeseq:codec",
         "//vaeseq:model",
         "//vaeseq:util",

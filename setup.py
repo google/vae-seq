@@ -24,8 +24,11 @@ setup(
         "pretty-midi>=0.2.8",
         "scipy>=0.16.0",
         "six>=1.0.0",
-        "tensorflow>=1.3.0",
     ],
+    extras_require={
+        "tf": ["tensorflow>=1.4.0"],
+        "tf_gpu": ["tensorflow-gpu>=1.4.0"],
+    },
     entry_points={
         "console_scripts": [
             "vaeseq-text = vaeseq.examples.text.text:main",

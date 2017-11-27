@@ -4,12 +4,10 @@ import itertools
 import os.path
 import tensorflow as tf
 
-from vaeseq import agent as agent_mod
 from vaeseq import codec
 from vaeseq import hparams as hparams_mod
 from vaeseq import model as model_mod
 from vaeseq import util
-from vaeseq import vae as vae_mod
 
 
 class ModelTest(tf.test.TestCase):
@@ -17,7 +15,10 @@ class ModelTest(tf.test.TestCase):
     def setUp(self):
         super(ModelTest, self).setUp()
         log_dir = os.path.join(self.get_temp_dir(), "log_dir")
-        session_params = model_mod.ModelBase.SessionParams(log_dir=log_dir)
+        session_config = tf.ConfigProto()
+        session_config.device_count["GPU"] = 0
+        session_params = model_mod.ModelBase.SessionParams(
+            log_dir=log_dir, session_config=session_config)
         self._setup_model(session_params)
 
     def _setup_model(self, session_params):
@@ -32,6 +33,17 @@ class ModelTest(tf.test.TestCase):
 
     def _evaluate(self):
         return self.model.evaluate(self.train_dataset, num_steps=20)
+
+    def test_inputs(self):
+        train_inputs, observed = self.model.dataset(
+            self.train_dataset)
+        self.assertEqual(train_inputs is None, self.model.inputs is None)
+        if self.model.inputs is not None:
+            gen_inputs = self.model.inputs.from_observations(inputs=None,
+                                                             observed=observed)
+            self.assertEqual(gen_inputs.dtype, train_inputs.dtype)
+            gen_inputs.get_shape().assert_is_compatible_with(
+                train_inputs.get_shape())
 
     def test_training_and_eval(self):
         train_debug1 = self._train()
@@ -50,23 +62,23 @@ class ModelTest(tf.test.TestCase):
 class MockModel(model_mod.ModelBase):
     """Modeling zeros for testing."""
 
-    def _make_vae(self):
-        obs_encoder = codec.MLPObsEncoder(self.hparams)
-        obs_decoder = codec.BatchDecoder(
+    def _make_encoder(self):
+        return codec.MLPObsEncoder(self.hparams)
+
+    def _make_decoder(self):
+        return codec.BatchDecoder(
             codec.MLPObsDecoder(
                 self.hparams,
                 codec.NormalDecoder(self.hparams),
                 param_size=4),
             event_size=[2])
-        agent = agent_mod.EncodeObsAgent(obs_encoder)
-        return vae_mod.make(self.hparams, agent, obs_encoder, obs_decoder)
 
-    def _open_dataset(self, dataset):
+    def _make_dataset(self, dataset):
         batch_size = util.batch_size(self.hparams)
         sequence_size = util.sequence_size(self.hparams)
         observed = tf.zeros([batch_size, sequence_size, 2])
-        contexts = self.vae.agent.contexts_for_static_observations(observed)
-        return contexts, observed
+        inputs = None
+        return inputs, observed
 
     def _make_output_summary(self, tag, observed):
         return tf.summary.histogram(tag, observed, collections=[])

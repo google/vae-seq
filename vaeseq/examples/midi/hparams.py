@@ -3,7 +3,7 @@
 from vaeseq import hparams as hparams_mod
 
 _DEFAULTS = dict(
-    rnn_hidden_sizes=[32, 32],
+    rnn_hidden_sizes=[512, 512],
     obs_encoder_fc_layers=[64, 32],
     obs_decoder_fc_hidden_layers=[64],
     latent_size=16,

@@ -11,14 +11,14 @@ py_library(
     srcs = ["hparams.py"],
     deps = [
         "//vaeseq:hparams",
-    ]
+    ],
 )
 
 py_library(
     name = "agent",
     srcs = ["agent.py"],
     deps = [
-        "//vaeseq:agent",
+        "//vaeseq:context",
         "//vaeseq:util",
     ],
 )
@@ -27,7 +27,6 @@ py_library(
     name = "environment",
     srcs = ["environment.py"],
     deps = [
-        "//vaeseq:agent",
         "//vaeseq:util",
     ],
 )
@@ -61,7 +60,7 @@ py_library(
         ":environment",
         "//vaeseq:model",
         "//vaeseq:util",
-        "//vaeseq/vae",
+        "//vaeseq:train",
     ],
 )
 

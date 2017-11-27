@@ -4,20 +4,30 @@ package(default_visibility = ["//visibility:public"])
 test_suite(
     name = "tests",
     tests = [
-          "agent_test",
-          "batch_dist_test",
-          "model_test",
-          "util_test",
-          "//vaeseq/examples/midi:tests",
-          "//vaeseq/examples/text:tests",
-          "//vaeseq/examples/play:tests",
-          "//vaeseq/vae:vae_test",
+        "batch_dist_test",
+        "context_test",
+        "model_test",
+        "util_test",
+        "//vaeseq/examples/midi:tests",
+        "//vaeseq/examples/play:tests",
+        "//vaeseq/examples/text:tests",
+        "//vaeseq/vae:vae_test",
     ],
 )
 
 py_library(
     name = "dist_module",
     srcs = ["dist_module.py"],
+    deps = [":util"],
+)
+
+py_library(
+    name = "vae_module",
+    srcs = ["vae_module.py"],
+    deps = [
+        ":dist_module",
+        ":util",
+    ],
 )
 
 py_library(
@@ -29,7 +39,7 @@ py_test(
     name = "batch_dist_test",
     srcs = ["batch_dist_test.py"],
     deps = [
-         ":batch_dist",
+        ":batch_dist",
     ],
 )
 
@@ -37,28 +47,8 @@ py_library(
     name = "latent",
     srcs = ["latent.py"],
     deps = [
-         ":dist_module",
-         ":util",
-    ],
-)
-
-py_library(
-    name = "gen_core",
-    srcs = ["gen_core.py"],
-    deps = [
-         ":agent",
-         ":dist_module",
-         ":util",
-    ],
-)
-
-py_library(
-    name = "eval_core",
-    srcs = ["eval_core.py"],
-    deps = [
-         ":agent",
-         ":dist_module",
-         ":util",
+        ":dist_module",
+        ":util",
     ],
 )
 
@@ -76,26 +66,25 @@ py_test(
     name = "util_test",
     srcs = ["util_test.py"],
     deps = [
-         ":hparams",
-         ":util",
+        ":hparams",
+        ":util",
     ],
 )
 
 py_library(
-    name = "agent",
-    srcs = ["agent.py"],
+    name = "context",
+    srcs = ["context.py"],
     deps = [
-         ":util",
+        ":util",
     ],
 )
 
 py_test(
-    name = "agent_test",
-    srcs = ["agent_test.py"],
+    name = "context_test",
+    srcs = ["context_test.py"],
     deps = [
-        ":agent",
         ":codec",
-        ":hparams",
+        ":context",
     ],
 )
 
@@ -121,6 +110,7 @@ py_library(
     name = "model",
     srcs = ["model.py"],
     deps = [
+        ":context",
         ":train",
         ":util",
     ],
@@ -130,7 +120,6 @@ py_test(
     name = "model_test",
     srcs = ["model_test.py"],
     deps = [
-        ":agent",
         ":codec",
         ":hparams",
         ":model",

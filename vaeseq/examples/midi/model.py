@@ -5,11 +5,9 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from vaeseq import agent as agent_mod
 from vaeseq import codec as codec_mod
 from vaeseq import model as model_mod
 from vaeseq import util
-from vaeseq import vae as vae_mod
 
 from . import dataset as dataset_mod
 
@@ -17,25 +15,18 @@ from . import dataset as dataset_mod
 class Model(model_mod.ModelBase):
     """Putting everything together."""
 
-    def _make_obs_encoder(self):
+    def _make_encoder(self):
         """Constructs an encoder for a single observation."""
         return codec_mod.MLPObsEncoder(self.hparams, name="obs_encoder")
 
-    def _make_obs_decoder(self):
+    def _make_decoder(self):
         """Constructs a decoder for a single observation."""
         note_decoder = codec_mod.BernoulliDecoder(dtype=tf.bool)
         return codec_mod.BatchDecoder(
             codec_mod.MLPObsDecoder(self.hparams, note_decoder, 128),
             event_size=[128], name="obs_decoder")
 
-    def _make_vae(self):
-        """Constructs a VAE for modeling character sequences."""
-        obs_encoder = self._make_obs_encoder()
-        obs_decoder = self._make_obs_decoder()
-        agent = agent_mod.EncodeObsAgent(obs_encoder)
-        return vae_mod.make(self.hparams, agent, obs_encoder, obs_decoder)
-
-    def _open_dataset(self, files):
+    def _make_dataset(self, files):
         dataset = dataset_mod.piano_roll_sequences(
             files,
             util.batch_size(self.hparams),
@@ -44,8 +35,8 @@ class Model(model_mod.ModelBase):
         iterator = dataset.make_initializable_iterator()
         tf.add_to_collection(tf.GraphKeys.LOCAL_INIT_OP, iterator.initializer)
         observed = iterator.get_next()
-        contexts = self.vae.agent.contexts_for_static_observations(observed)
-        return contexts, observed
+        inputs = None
+        return inputs, observed
 
     # Samples per second when generating audio output.
     SYNTHESIZED_RATE = 16000

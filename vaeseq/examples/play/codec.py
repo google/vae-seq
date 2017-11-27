@@ -13,6 +13,14 @@ from vaeseq import util
 ObsEncoder = codec.MLPObsEncoder
 
 
+class InputEncoder(codec.FlattenObsEncoder):
+    """Passes through the input action logits."""
+
+    def __init__(self, hparams, name=None):
+        input_size = tf.TensorShape([hparams.game_action_space])
+        super(InputEncoder, self).__init__(input_size=input_size, name=name)
+
+
 class ObsDecoder(dist_module.DistModule):
     """Parameterizes a set of distributions for outputs, score and game-over.
 
@@ -20,8 +28,10 @@ class ObsDecoder(dist_module.DistModule):
 
     * The game outputs modeled by a diagonal multivariate normal.
     * The current score (a Normal distribution).
+    * Whether the game is over next step. For simplicity, modeled as a normal
+      with -1/+1 labels.
 
-    Both output distributions are reparameterizable, so there is a
+    All output distributions are reparameterizable, so there is a
     pathwise derivative w.r.t. their parameters.
     """
 
@@ -31,24 +41,25 @@ class ObsDecoder(dist_module.DistModule):
 
     @property
     def event_size(self):
-        """The shapes of the observations."""
         return dict(output=tf.TensorShape(self._hparams.game_output_size),
-                    score=tf.TensorShape([]),)
+                    score=tf.TensorShape([]),
+                    game_over=tf.TensorShape([]))
 
     @property
     def event_dtype(self):
-        """The data type of the observations."""
         return dict(output=tf.float32,
-                    score=tf.float32)
+                    score=tf.float32,
+                    game_over=tf.float32)
 
     def dist(self, params, name=None):
         """The output distribution."""
         name = name or self.module_name + "_dist"
         with tf.name_scope(name):
-            params_output, params_score = params
+            params_output, params_score, params_game_over = params
             components = dict(
                 output=self._dist_output(params_output),
-                score=self._dist_score(params_score))
+                score=self._dist_score(params_score),
+                game_over=self._dist_game_over(params_game_over))
         return batch_dist.GroupDistribution(components, name=name)
 
     def _dist_output(self, params):
@@ -62,6 +73,11 @@ class ObsDecoder(dist_module.DistModule):
         loc, scale = params
         return tf.distributions.Normal(loc, scale, name="score")
 
+    def _dist_game_over(self, params):
+        """Distribution for the game over flag."""
+        loc, scale = params
+        return tf.distributions.Normal(loc, scale, name="game_over")
+
     def _build(self, inputs):
         hparams = self._hparams
         hidden = snt.Sequential([
@@ -72,7 +88,8 @@ class ObsDecoder(dist_module.DistModule):
                 activate_final=True),
         ])(inputs)
         return (self._build_game_output(hidden),
-                self._build_score(hidden))
+                self._build_score(hidden),
+                self._build_game_over(hidden))
 
     def _build_game_output(self, hidden):
         """Parameters for the game output prediction."""
@@ -85,6 +102,13 @@ class ObsDecoder(dist_module.DistModule):
     def _build_score(self, hidden):
         """Parameters for the game score prediction."""
         lin = snt.Linear(2, name="score")
+        loc, scale_unproj = tf.unstack(lin(hidden), axis=-1)
+        scale = util.positive_projection(self._hparams)(scale_unproj)
+        return loc, scale
+
+    def _build_game_over(self, hidden):
+        """Parameters for the game over prediction."""
+        lin = snt.Linear(2, name="game_over")
         loc, scale_unproj = tf.unstack(lin(hidden), axis=-1)
         scale = util.positive_projection(self._hparams)(scale_unproj)
         return loc, scale

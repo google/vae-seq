@@ -13,51 +13,70 @@ Notation:
 
     Generative model                Inference model
   =====================          =====================
-      x_1        x_t        z_0 -> z_1 ---------> z_t
-     / ^        / ^                 ^              ^
-    |  |       |  |                 |              |
-z_0-|>z_1 -----> z_t               e_1 <--------- e_t
-    |  ^       |  ^               / ^           /  ^
-     \ |        \ |            x_1  |        x_t   |
-      d_1 -----> d_t               d_1 ---------> d_t
-       ^          ^                 ^              ^
-       |          |                 |              |
-      c_1        c_t               c_1            c_t
+ z_0 -> z_1 -----> z_t        z_0 -> z_1 ---------> z_t
+  |      ^   |      ^                 ^              ^
+  v      |   v      |                 |              |
+ x_1 <-. |  x_t <-. |                 |              |
+        \|         \|                e_1 <--------- e_t
+         *          *               / ^            / ^
+         |          |            x_1  |         x_t  |
+        d_1 -----> d_t               d_1 ---------> d_t
+         ^          ^                 ^              ^
+         |          |                 |              |
+        c_1        c_t               c_1            c_t
 """
 
 import sonnet as snt
 import tensorflow as tf
 
-from . import base
-from .. import dist_module
 from .. import latent as latent_mod
 from .. import util
+from .. import vae_module
 
-class SRNN(base.VAEBase):
+class SRNN(vae_module.VAECore):
     """Implementation of SRNN (see module description)."""
 
-    def __init__(self, hparams, agent, obs_encoder, obs_decoder, name=None):
-        self._hparams = hparams
-        self._obs_encoder = obs_encoder
-        self._obs_decoder = obs_decoder
-        super(SRNN, self).__init__(agent, name=name)
+    def __init__(self, hparams, obs_encoder, obs_decoder, name=None):
+        super(SRNN, self).__init__(hparams, obs_encoder, obs_decoder, name)
+        with self._enter_variable_scope():
+            self._d_core = util.make_rnn(hparams, name="d_core")
+            self._e_core = util.make_rnn(hparams, name="e_core")
+            self._latent_p = latent_mod.LatentDecoder(hparams, name="latent_p")
+            self._latent_q = latent_mod.LatentDecoder(hparams, name="latent_q")
 
-    def _init_submodules(self):
-        hparams = self._hparams
-        self._d_core = util.make_rnn(hparams, name="d_core")
-        self._e_core = util.make_rnn(hparams, name="e_core")
-        self._latent_p = latent_mod.LatentDecoder(hparams, name="latent_p")
-        self._latent_q = latent_mod.LatentDecoder(hparams, name="latent_q")
-        self._latent_prior_distcore = LatentPrior(self._d_core, self._latent_p)
-        self._observed_distcore = ObsDist(self._d_core, self._obs_decoder)
+    @property
+    def state_size(self):
+        return (self._d_core.state_size, self._latent_p.event_size)
+
+    def _build(self, context, state):
+        d_state, latent = state
+        d_out, d_state = self._d_core(util.concat_features(context), d_state)
+        latent_params = self._latent_p(d_out, latent)
+        return self._obs_decoder((d_out, latent)), (d_state, latent_params)
+
+    def _next_state(self, state_arg, event=None):
+        del event  # Not used.
+        d_state, latent_params = state_arg
+        return d_state, self._latent_p.dist(latent_params, name="latent")
+
+    def _initial_state(self, batch_size):
+        d_state = self._d_core.initial_state(batch_size)
+        latent_input_sizes = (self._d_core.output_size,
+                              self._latent_p.event_size)
+        latent_inputs = snt.nest.map(
+            lambda size: tf.zeros(
+                [batch_size] + tf.TensorShape(size).as_list(),
+                name="latent_input"),
+            latent_input_sizes)
+        latent_params = self._latent_p(latent_inputs)
+        return self._next_state((d_state, latent_params), event=None)
 
     def infer_latents(self, contexts, observed):
         hparams = self._hparams
         batch_size = util.batch_size_from_nested_tensors(observed)
-        z_initial, d_initial = self.latent_prior_distcore.samples.initial_state(
-            batch_size)
-        d_outs, _ = tf.nn.dynamic_rnn(
-            self._d_core,
+        d_initial, z_initial = self.initial_state(batch_size)
+        (d_outs, d_states), _ = tf.nn.dynamic_rnn(
+            util.state_recording_rnn(self._d_core),
             util.concat_features(contexts),
             initial_state=d_initial)
         enc_observed = snt.BatchApply(self._obs_encoder, n_dims=2)(observed)
@@ -90,70 +109,4 @@ class SRNN(base.VAEBase):
             (d_outs, e_outs),
             initial_state=z_initial,
             output_dtypes=(self._latent_q.event_dtype, tf.float32))
-        return latents, kls
-
-
-class ObsDist(dist_module.DistCore):
-    """DistCore for producing p(observation | context, latent)."""
-
-    def __init__(self, d_core, obs_decoder, name=None):
-        super(ObsDist, self).__init__(name=name)
-        self._d_core = d_core
-        self._obs_decoder = obs_decoder
-
-    @property
-    def state_size(self):
-        return self._d_core.state_size
-
-    @property
-    def event_size(self):
-        return self._obs_decoder.event_size
-
-    @property
-    def event_dtype(self):
-        return self._obs_decoder.event_dtype
-
-    def dist(self, params, name=None):
-        return self._obs_decoder.dist(params, name=name)
-
-    def _next_state(self, d_state, event=None):
-        del event  # Not used.
-        return d_state
-
-    def _build(self, inputs, d_state):
-        context, latent = inputs
-        d_out, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._obs_decoder((d_out, latent)), d_state
-
-
-class LatentPrior(dist_module.DistCore):
-    """DistCore that produces Normal latent variables."""
-
-    def __init__(self, d_core, latent_p, name=None):
-        super(LatentPrior, self).__init__(name=name)
-        self._d_core = d_core
-        self._latent_p = latent_p
-
-    @property
-    def state_size(self):
-        return (self._latent_p.event_size,  # prev_latent
-                self._d_core.state_size,)   # d state
-
-    @property
-    def event_size(self):
-        return self._latent_p.event_size
-
-    @property
-    def event_dtype(self):
-        return self._latent_p.event_dtype
-
-    def dist(self, params, name=None):
-        return self._latent_p.dist(params, name=name)
-
-    def _next_state(self, d_state, event=None):
-        return (event, d_state)
-
-    def _build(self, context, state):
-        prev_latent, d_state = state
-        d_out, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._latent_p(d_out, prev_latent), d_state
+        return (d_states, latents), kls

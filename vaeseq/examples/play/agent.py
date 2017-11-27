@@ -1,36 +1,72 @@
 """Game-playing agent."""
 
+import abc
 import sonnet as snt
 import tensorflow as tf
 
-from vaeseq import agent as agent_mod
+from vaeseq import context as context_mod
 from vaeseq import util
 
 
-class TrainableAgent(agent_mod.Agent):
-    """An agent where the context is both an encoding of the previous
-       observation and the parameters of an action policy.
-    """
+class AgentBase(context_mod.Context):
+    """Base class for input agents."""
+
+    def __init__(self, hparams, name=None):
+        super(AgentBase, self).__init__(name=name)
+        self._hparams = hparams
+        self._num_actions = tf.TensorShape([self._hparams.game_action_space])
+
+    @property
+    def output_size(self):
+        return self._num_actions
+
+    @property
+    def output_dtype(self):
+        return tf.float32
+
+    @abc.abstractmethod
+    def get_variables(self):
+        """Returns the variables used by this Agent."""
+
+
+class RandomAgent(AgentBase):
+    """Produces actions randomly, for exploration."""
+
+    def __init__(self, hparams, name=None):
+        super(RandomAgent, self).__init__(hparams, name=name)
+        self._dist = tf.distributions.Dirichlet(tf.ones(self._num_actions))
+
+    @property
+    def state_size(self):
+        return tf.TensorShape([0])
+
+    @property
+    def state_dtype(self):
+        return tf.float32
+
+    def observe(self, observation, state):
+        return state
+
+    def get_variables(self):
+        return None
+
+    def _build(self, input_, state):
+        del input_  # Not used.
+        batch_size = tf.shape(state)[0]
+        return self._dist.sample(batch_size), state
+
+
+class TrainableAgent(AgentBase):
+    """Produces actions from a policy RNN."""
 
     def __init__(self, hparams, obs_encoder, name=None):
-        super(TrainableAgent, self).__init__(name=name)
-        self._hparams = hparams
-        self._obs_encoder = obs_encoder
-        self._num_actions = tf.TensorShape([self._hparams.game_action_space])
+        super(TrainableAgent, self).__init__(hparams, name=name)
         self._agent_variables = None
+        self._obs_encoder = obs_encoder
         with self._enter_variable_scope():
             self._policy_rnn = util.make_rnn(hparams, name="policy_rnn")
             self._project_act = util.make_mlp(
                 hparams, layers=[hparams.game_action_space], name="policy_proj")
-
-    @property
-    def context_size(self):
-        return (self._num_actions,
-                self._obs_encoder.output_size)
-
-    @property
-    def context_dtype(self):
-        return (tf.float32, tf.float32)
 
     @property
     def state_size(self):
@@ -40,57 +76,32 @@ class TrainableAgent(agent_mod.Agent):
 
     @property
     def state_dtype(self):
-        return dict(policy=tf.float32,
-                    action_logits=tf.float32,
-                    obs_enc=tf.float32)
-
-    def initial_state(self, batch_size):
-        return snt.nest.map(
-            lambda size: tf.zeros([batch_size] +
-                                  tf.TensorShape(size).as_list()),
-            self.state_size)
+        return snt.nest.map(lambda _: tf.float32, self.state_size)
 
     def get_variables(self):
         if self._agent_variables is None:
             raise ValueError("Agent variables haven't been constructed yet.")
         return self._agent_variables
 
-    def rewards(self, observed):
-        if self._hparams.train_agent:
-            return observed["score"]
-        return None
-
-    def observe(self, agent_input, observation, state):
-        del agent_input  # Unused.
+    def observe(self, observation, state):
         obs_enc = self._obs_encoder(observation)
         rnn_state = state["policy"]
         hidden, rnn_state = self._policy_rnn(obs_enc, rnn_state)
         action_logits = self._project_act(hidden)
+        if self._agent_variables is None:
+            self._agent_variables = snt.nest.flatten(
+                (self._policy_rnn.get_variables(),
+                 self._project_act.get_variables()))
         if self._hparams.explore_temp > 0:
             dist = tf.contrib.distributions.ExpRelaxedOneHotCategorical(
                 self._hparams.explore_temp,
                 logits=action_logits)
             action_logits = dist.sample()
-        self._agent_variables = (self._policy_rnn.get_variables(),
-                                 self._project_act.get_variables())
         return dict(policy=rnn_state,
                     action_logits=action_logits,
                     obs_enc=obs_enc)
 
-    def context(self, agent_input, state):
-        del agent_input  # Unused.
-        return (tf.nn.softmax(state["action_logits"]),
-                state["obs_enc"])
-
-    @property
-    def action_size(self):
-        return tf.TensorShape([])
-
-    @property
-    def action_dtype(self):
-        return tf.int32
-
-    def action(self, agent_input, state):
-        dist = tf.distributions.Categorical(logits=state["action_logits"],
-                                            dtype=self.action_dtype)
-        return dist.sample()
+    def _build(self, input_, state):
+        if input_ is not None:
+            raise ValueError("I don't know how to encode any inputs.")
+        return state["action_logits"], state

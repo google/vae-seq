@@ -5,11 +5,10 @@ from __future__ import print_function
 import sonnet as snt
 import tensorflow as tf
 
-from vaeseq import agent as agent_mod
+from vaeseq import context as context_mod
 from vaeseq import codec as codec_mod
 from vaeseq import model as model_mod
 from vaeseq import util
-from vaeseq import vae as vae_mod
 
 from . import dataset as dataset_mod
 
@@ -24,7 +23,7 @@ class Model(model_mod.ModelBase):
             num_oov_buckets=hparams.oov_buckets)
         super(Model, self).__init__(hparams, session_params)
 
-    def _make_obs_encoder(self):
+    def _make_encoder(self):
         """Constructs an encoding for a single character ID."""
         embed = snt.Embed(
             vocab_size=self.hparams.vocab_size + self.hparams.oov_buckets,
@@ -32,7 +31,7 @@ class Model(model_mod.ModelBase):
         mlp = codec_mod.MLPObsEncoder(self.hparams)
         return codec_mod.EncoderSequence([embed, mlp], name="obs_encoder")
 
-    def _make_obs_decoder(self):
+    def _make_decoder(self):
         """Constructs a decoding for a single character ID."""
         return codec_mod.MLPObsDecoder(
             self.hparams,
@@ -40,21 +39,15 @@ class Model(model_mod.ModelBase):
             param_size=self.hparams.vocab_size + self.hparams.oov_buckets,
             name="obs_decoder")
 
-    def _make_vae(self):
-        obs_encoder = self._make_obs_encoder()
-        obs_decoder = self._make_obs_decoder()
-        agent = agent_mod.EncodeObsAgent(obs_encoder)
-        return vae_mod.make(self.hparams, agent, obs_encoder, obs_decoder)
-
-    def _open_dataset(self, corpus):
+    def _make_dataset(self, corpus):
         dataset = dataset_mod.characters(corpus,
                                          util.batch_size(self.hparams),
                                          util.sequence_size(self.hparams))
         iterator = dataset.make_initializable_iterator()
         tf.add_to_collection(tf.GraphKeys.LOCAL_INIT_OP, iterator.initializer)
         observed = self._char_to_id.lookup(iterator.get_next())
-        contexts = self.vae.agent.contexts_for_static_observations(observed)
-        return contexts, observed
+        inputs = None
+        return inputs, observed
 
     def _make_output_summary(self, tag, observed):
         return tf.summary.text(tag, self._render(observed), collections=[])

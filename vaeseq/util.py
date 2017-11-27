@@ -23,23 +23,43 @@ def activation(hparams):
 
 def positive_projection(hparams):
     """Returns the positive projection selected in hparams."""
-    return {
+    proj = {
         "exp": tf.exp,
         "softplus": tf.nn.softplus,
     }[hparams.positive_projection]
+    return lambda tensor: proj(tensor) + hparams.positive_eps
 
+
+def regularizer(hparams):
+    def _apply_regularizer(tensor):
+        with tf.control_dependencies(None):
+            return tf.contrib.layers.l1_l2_regularizer(
+                scale_l1=hparams.l1_regularization,
+                scale_l2=hparams.l2_regularization)(tensor)
+    return _apply_regularizer
 
 def make_rnn(hparams, name):
     """Constructs a DeepRNN using hparams.rnn_hidden_sizes."""
+    regularizers = {
+        snt.LSTM.W_GATES: regularizer(hparams)
+    }
     with tf.variable_scope(name):
-        layers = [snt.LSTM(size) for size in hparams.rnn_hidden_sizes]
+        layers = [snt.LSTM(size, regularizers=regularizers)
+                  for size in hparams.rnn_hidden_sizes]
         return snt.DeepRNN(layers, skip_connections=False, name=name)
 
 
 def make_mlp(hparams, layers, name=None, **kwargs):
     """Constructs an MLP with the given layers, using hparams.activation."""
+    regularizers = {
+        "w": regularizer(hparams)
+    }
     return snt.nets.MLP(
-        layers, activation=activation(hparams), name=name or "MLP", **kwargs)
+        layers,
+        activation=activation(hparams),
+        regularizers=regularizers,
+        name=name or "MLP",
+        **kwargs)
 
 
 def concat_features(tensors):
@@ -93,6 +113,37 @@ def add_support_for_scalar_rnn_inputs(cell, inputs):
         state_size=cell.state_size,
         output_size=cell.output_size)
     return ret_cell, inputs
+
+
+def input_recording_rnn(cell, input_size):
+    """Transforms the cell to emit both the output and input."""
+    def _step(input_, state):
+        output, state = cell(input_, state)
+        return (output, input_), state
+    return WrapRNNCore(
+        _step,
+        state_size=cell.state_size,
+        output_size=(cell.output_size, input_size))
+
+
+def state_recording_rnn(cell):
+    """Transforms the cell to emit both the output and the state."""
+    def _step(input_, state):
+        output, next_state = cell(input_, state)
+        return (output, state), next_state
+    return WrapRNNCore(
+        _step,
+        state_size=cell.state_size,
+        output_size=(cell.output_size, cell.state_size))
+
+
+def use_recorded_state_rnn(cell):
+    """Transforms the cell to use the recorded state in the input."""
+    def _step(input_state, state):
+        del state  # unused
+        input_, state = input_state
+        return cell(input_, state)
+    return WrapRNNCore(_step, cell.state_size, cell.output_size)
 
 
 def heterogeneous_dynamic_rnn(

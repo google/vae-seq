@@ -23,28 +23,41 @@ Notation:
 import sonnet as snt
 import tensorflow as tf
 
-from . import base
-from .. import dist_module
 from .. import latent as latent_mod
 from .. import util
+from .. import vae_module
 
-class IndependentSequence(base.VAEBase):
+class IndependentSequence(vae_module.VAECore):
     """Implementation of a Sequential VAE with independent latent variables."""
 
-    def __init__(self, hparams, agent, obs_encoder, obs_decoder, name=None):
-        self._hparams = hparams
-        self._obs_encoder = obs_encoder
-        self._obs_decoder = obs_decoder
-        super(IndependentSequence, self).__init__(agent, name=name)
+    def __init__(self, hparams, obs_encoder, obs_decoder, name=None):
+        super(IndependentSequence, self).__init__(
+            hparams, obs_encoder, obs_decoder, name)
+        with self._enter_variable_scope():
+            self._d_core = util.make_rnn(hparams, name="d_core")
+            self._e_core = util.make_rnn(hparams, name="e_core")
+            self._f_core = util.make_rnn(hparams, name="f_core")
+            self._q_z = latent_mod.LatentDecoder(hparams, name="latent_q")
 
-    def _init_submodules(self):
-        hparams = self._hparams
-        self._d_core = util.make_rnn(hparams, name="d_core")
-        self._e_core = util.make_rnn(hparams, name="e_core")
-        self._f_core = util.make_rnn(hparams, name="f_core")
-        self._q_z = latent_mod.LatentDecoder(hparams, name="latent_q")
-        self._latent_prior_distcore = LatentPrior(hparams)
-        self._observed_distcore = ObsDist(self._d_core, self._obs_decoder)
+    @property
+    def state_size(self):
+        return (self._d_core.state_size, self._q_z.event_size)
+
+    def _build(self, context, state):
+        d_state, latent = state
+        d_out, d_state = self._d_core(
+            util.concat_features((context, latent)), d_state)
+        return self._obs_decoder(d_out), d_state
+
+    def _next_state(self, d_state, event=None):
+        del event  # Not used.
+        batch_size = util.batch_size_from_nested_tensors(d_state)
+        latent_dist = _latent_prior(self._hparams, batch_size)
+        return (d_state, latent_dist)
+
+    def _initial_state(self, batch_size):
+        return self._next_state(
+            self._d_core.initial_state(batch_size), event=None)
 
     def infer_latents(self, contexts, observed):
         hparams = self._hparams
@@ -67,76 +80,18 @@ class IndependentSequence(base.VAEBase):
             scale_diag=tf.ones_like(latents),
             name="p_zs")
         divs = util.calc_kl(hparams, latents, q_zs, p_zs)
-        return latents, divs
+        (_unused_d_outs, d_states), _ = tf.nn.dynamic_rnn(
+            util.state_recording_rnn(self._d_core),
+            util.concat_features((contexts, latents)),
+            initial_state=self._d_core.initial_state(batch_size))
+        return (d_states, latents), divs
 
 
-class ObsDist(dist_module.DistCore):
-    """DistCore for producing p(observation | context, latent)."""
-
-    def __init__(self, d_core, obs_decoder, name=None):
-        super(ObsDist, self).__init__(name=name)
-        self._d_core = d_core
-        self._obs_decoder = obs_decoder
-
-    @property
-    def state_size(self):
-        return self._d_core.state_size
-
-    @property
-    def event_size(self):
-        return self._obs_decoder.event_size
-
-    @property
-    def event_dtype(self):
-        return self._obs_decoder.event_dtype
-
-    def dist(self, params, name=None):
-        return self._obs_decoder.dist(params, name=name)
-
-    def _next_state(self, d_state, event=None):
-        del event  # Not used.
-        return d_state
-
-    def _build(self, inputs, d_state):
-        context, latent = inputs
-        d_out, d_state = self._d_core(util.concat_features(context), d_state)
-        return self._obs_decoder((d_out, latent)), d_state
-
-
-class LatentPrior(dist_module.DistCore):
-    """DistCore that samples standard normal latents."""
-
-    def __init__(self, hparams, name=None):
-        super(LatentPrior, self).__init__(name=name)
-        self._hparams = hparams
-
-    @property
-    def state_size(self):
-        return ()
-
-    @property
-    def event_size(self):
-        return tf.TensorShape(self._hparams.latent_size)
-
-    @property
-    def event_dtype(self):
-        return tf.float32
-
-    def dist(self, batch_size, name=None):
-        dims = tf.stack([batch_size, self._hparams.latent_size])
-        loc = tf.zeros(dims)
-        loc.set_shape([None, self._hparams.latent_size])
-        scale_diag = tf.ones(dims)
-        scale_diag.set_shape([None, self._hparams.latent_size])
-        return tf.contrib.distributions.MultivariateNormalDiag(
-            loc=loc, scale_diag=scale_diag,
-            name=name or self.module_name + "_dist")
-
-    def _next_state(self, state_arg, event=None):
-        del state_arg, event  # No state.
-        return ()
-
-    def _build(self, context, state):
-        del state  # No state needed.
-        batch_size = util.batch_size_from_nested_tensors(context)
-        return batch_size, ()
+def _latent_prior(hparams, batch_size):
+    dims = tf.stack([batch_size, hparams.latent_size])
+    loc = tf.zeros(dims)
+    loc.set_shape([None, hparams.latent_size])
+    scale_diag = tf.ones(dims)
+    scale_diag.set_shape([None, hparams.latent_size])
+    return tf.contrib.distributions.MultivariateNormalDiag(
+        loc=loc, scale_diag=scale_diag, name="latent")

@@ -7,8 +7,12 @@ import abc
 import six
 import tensorflow as tf
 
+from google.protobuf import text_format
+
+from . import context as context_mod
 from . import train as train_mod
 from . import util
+from . import vae as vae_mod
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -18,14 +22,18 @@ class ModelBase(object):
     def __init__(self, hparams, session_params):
         self._hparams = hparams
         self._session_params = session_params
+        with tf.name_scope("model") as ns:
+            self._name_scope = ns
 
     class SessionParams(object):
         """Utility class for commonly used session parameters."""
 
-        def __init__(self, log_dir=None, master="", task=0):
+        def __init__(self, log_dir=None, master="", task=0,
+                     session_config=None):
             self.log_dir = log_dir
             self.master = master
             self.task = task
+            self.session_config = session_config
 
         @classmethod
         def add_parser_arguments(cls, parser):
@@ -41,26 +49,67 @@ class ModelBase(object):
                                 help="Session master.")
             parser.add_argument("--task", default=defaults.task,
                                 help="Worker task number.")
-
+            def _parse_config_proto(msg):
+                return text_format.Parse(msg, tf.ConfigProto())
+            parser.add_argument("--session-config", default=None,
+                                type=_parse_config_proto,
+                                help="Session ConfigProto.")
 
     @property
     def hparams(self):
         return self._hparams
 
+    def name_scope(self, name, default_name=None, values=None):
+        with tf.name_scope(self._name_scope):
+            # Capture the sub-namescope as an absolute path.
+            with tf.name_scope(name, default_name, values) as ns:
+                return tf.name_scope(ns)
+
     @util.lazy_property
-    def vae(self):
-        with tf.name_scope("vae"):
-            return self._make_vae()
+    def encoder(self):
+        with self.name_scope("encoder"):
+            return self._make_encoder()
+
+    @util.lazy_property
+    def decoder(self):
+        with self.name_scope("decoder"):
+            return self._make_decoder()
+
+    @util.lazy_property
+    def context(self):
+        with self.name_scope("context"):
+            return self._make_context()
+
+    @util.lazy_property
+    def inputs(self):
+        with self.name_scope("inputs"):
+            inputs = self._make_inputs()
+            if inputs is None:
+                return None
+            if isinstance(inputs, context_mod.Context):
+                return inputs
+            return context_mod.Constant(inputs)
 
     @util.lazy_property
     def trainer(self):
-        return train_mod.Trainer(self.hparams, self.vae,
-                                 tf.train.get_or_create_global_step())
+        with self.name_scope("trainer"):
+            return self._make_trainer()
+
+    @util.lazy_property
+    def vae(self):
+        with self.name_scope("vae"):
+            return vae_mod.make(self.hparams, self.encoder, self.decoder)
+
+    def dataset(self, dataset, name=None):
+        """Returns inputs and observations for the given dataset."""
+        with self.name_scope("dataset", name):
+            return self._make_dataset(dataset)
 
     def training_session(self, hooks=None):
         scaffold = self._make_scaffold()
         return tf.train.MonitoredTrainingSession(
             master=self._session_params.master,
+            config=self._session_params.session_config,
             is_chief=(self._session_params.task == 0),
             scaffold=scaffold,
             hooks=hooks,
@@ -71,11 +120,13 @@ class ModelBase(object):
         if self._session_params.task == 0:
             session_creator = tf.train.ChiefSessionCreator(
                 master=self._session_params.master,
+                config=self._session_params.session_config,
                 scaffold=scaffold,
                 checkpoint_dir=self._session_params.log_dir)
         else:
             session_creator = tf.train.WorkerSessionCreator(
                 master=self._session_params.master,
+                config=self._session_params.session_config,
                 scaffold=scaffold)
         return tf.train.MonitoredSession(
             hooks=hooks,
@@ -84,9 +135,12 @@ class ModelBase(object):
     def evaluate(self, dataset, num_steps):
         """Calculates the mean log-prob for the given sequences."""
         with tf.name_scope("evaluate"):
-            contexts, observed = self._open_dataset(dataset)
-            log_probs = self.vae.eval_core.from_contexts.log_probs(
-                contexts, observed)
+            inputs, observed = self.dataset(dataset)
+            contexts = self.context.from_observations(inputs=inputs,
+                                                      observed=observed)
+            log_probs = self.vae.evaluate(
+                contexts, observed,
+                samples=self.hparams.log_prob_samples)
             mean_log_prob, update = tf.metrics.mean(log_probs)
         hooks = [tf.train.LoggingTensorHook({"log_prob": mean_log_prob},
                                             every_n_secs=10., at_end=True)]
@@ -102,10 +156,12 @@ class ModelBase(object):
 
     def train(self, dataset, num_steps, valid_dataset=None):
         """Trains/continues training the model."""
-        with tf.name_scope("train"):
-            contexts, observed = self._open_dataset(dataset)
-        train_op, debug = self.trainer(contexts, observed)
-
+        global_step = tf.train.get_or_create_global_step()
+        inputs, observed = self.dataset(dataset, name="train_dataset")
+        contexts = self.context.from_observations(inputs=inputs,
+                                                  observed=observed)
+        train_op, debug = self.trainer(inputs, contexts, observed)
+        debug["global_step"] = global_step
         hooks = [tf.train.LoggingTensorHook(debug, every_n_secs=60.)]
         if self._session_params.log_dir:
             # Add metric summaries to be computed at a slower rate.
@@ -113,8 +169,9 @@ class ModelBase(object):
             def _add_to_slow_summaries(name, contexts, observed):
                 """Creates a self-updating metric summary op."""
                 with tf.name_scope(name):
-                    log_probs = self.vae.eval_core.from_contexts.log_probs(
-                        contexts, observed)
+                    log_probs = self.vae.evaluate(
+                        contexts, observed,
+                        samples=self.hparams.log_prob_samples)
                     mean, update = tf.metrics.mean(log_probs)
                     with tf.control_dependencies([update]):
                         slow_summaries.append(
@@ -122,8 +179,10 @@ class ModelBase(object):
                                               mean, collections=[]))
             _add_to_slow_summaries("train_eval", contexts, observed)
             if valid_dataset is not None:
-                with tf.name_scope("valid"):
-                    vcontexts, vobserved = self._open_dataset(valid_dataset)
+                vinputs, vobserved = self.dataset(valid_dataset,
+                                                  name="valid_dataset")
+                vcontexts = self.context.from_observations(inputs=vinputs,
+                                                           observed=vobserved)
                 _add_to_slow_summaries("valid_eval", vcontexts, vobserved)
             hooks.append(tf.train.SummarySaverHook(
                 save_steps=100,
@@ -131,10 +190,11 @@ class ModelBase(object):
                 summary_op=tf.summary.merge(slow_summaries)))
 
             # Add sample generated sequences.
-            batch_size = util.batch_size_from_nested_tensors(observed)
-            sequence_size = util.sequence_size_from_nested_tensors(observed)
-            generated = self.vae.gen_core.generate(
-                self.vae.agent.get_inputs(batch_size, sequence_size))[0]
+            generated, _unused_latents = self.vae.generate(
+                inputs=inputs,
+                context=self.context,
+                batch_size=util.batch_size_from_nested_tensors(observed),
+                sequence_size=util.sequence_size_from_nested_tensors(observed))
             hooks.append(tf.train.SummarySaverHook(
                 save_steps=1000,
                 output_dir=self._session_params.log_dir,
@@ -156,9 +216,9 @@ class ModelBase(object):
 
     def generate(self):
         """Generates sequences from a trained model."""
-        generated = self.vae.gen_core.generate(
-            self.vae.agent.get_inputs(util.batch_size(self.hparams),
-                                      util.sequence_size(self.hparams)))[0]
+        generated, _unused_latents = self.vae.generate(
+            inputs=self.inputs,
+            context=self.context)
         rendered = self._render(generated)
         with self.eval_session() as sess:
             batch = sess.run(rendered)
@@ -176,21 +236,32 @@ class ModelBase(object):
         """Returns a rendering of the modeled observation for output."""
         return observed
 
-    def _make_elbo_loss(self):
-        """Returns a (contexts, observed) -> (loss, debug_tensors) map."""
-        return train_mod.ELBOLoss(self.hparams, self.vae)
+    def _make_context(self):
+        """Constructs the Context."""
+        # Default to an encoding of the previous observation..
+        return context_mod.EncodeObserved(self.encoder)
 
-    def _make_agent_loss(self):
-        """Returns a (observed, log_probs) -> (loss, debug_tensors) map."""
-        return None
+    def _make_inputs(self):
+        """Constructs input Context or tensors.."""
+        return None  # No inputs.
+
+    def _make_trainer(self):
+        global_step = tf.train.get_or_create_global_step()
+        loss = train_mod.ELBOLoss(self.hparams, self.vae)
+        return train_mod.Trainer(self.hparams, global_step=global_step,
+                                 loss=loss, variables=tf.trainable_variables)
 
     @abc.abstractmethod
-    def _make_vae(self):
-        """Constructs the VAE."""
+    def _make_encoder(self):
+        """Constructs the observation encoder."""
 
     @abc.abstractmethod
-    def _open_dataset(self, dataset):
-        """Returns contexts and observations."""
+    def _make_decoder(self):
+        """Constructs the observation decoder DistModule."""
+
+    @abc.abstractmethod
+    def _make_dataset(self, dataset):
+        """Returns inputs (can be None) and outputs as sequence Tensors."""
 
     @abc.abstractmethod
     def _make_output_summary(self, tag, observed):

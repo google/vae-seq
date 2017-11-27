@@ -35,10 +35,10 @@ def piano_roll_sequences(filenames, batch_size, sequence_size, rate=100):
                                 [filename, sequence_size],
                                 [tf.bool])
         sequences.set_shape([None, None, 128])
-        return tf.contrib.data.Dataset.from_tensor_slices(sequences)
+        return tf.data.Dataset.from_tensor_slices(sequences)
 
     batch_size = tf.to_int64(batch_size)
-    return (tf.contrib.data.Dataset.from_tensor_slices(filenames)
+    return (tf.data.Dataset.from_tensor_slices(filenames)
             .interleave(_to_piano_roll_dataset,
                         cycle_length=batch_size * 5,
                         block_length=1)
