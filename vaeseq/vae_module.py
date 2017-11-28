@@ -19,8 +19,12 @@ class VAECore(dist_module.DistCore):
         self._obs_decoder = obs_decoder
 
     @abc.abstractmethod
-    def infer_latents(self, contexts, observed):
+    def _infer_latents(self, inputs, observed):
         """Returns a sequence of latent states and their divergences."""
+
+    def infer_latents(self, inputs, observed):
+        inputs = context_mod.as_tensors(inputs, observed)
+        return self._infer_latents(inputs, observed)
 
     @property
     def event_size(self):
@@ -33,15 +37,15 @@ class VAECore(dist_module.DistCore):
     def dist(self, params, name=None):
         return self._obs_decoder.dist(params, name=name)
 
-    def evaluate(self, contexts, observed,
+    def evaluate(self, inputs, observed,
                  latents=None, initial_state=None, samples=1):
         """Evaluates the log-probabilities of each given observation."""
-        cell, inputs = self.log_probs, (contexts, observed)
+        inputs = context_mod.as_tensors(inputs, observed)
+        cell, inputs = self.log_probs, (inputs, observed)
         if latents is not None:
             if initial_state is not None:
                 raise ValueError("Cannot specify initial state and latents.")
-            inputs = (inputs, latents)
-            cell = util.use_recorded_state_rnn(cell)
+            cell, inputs = util.use_recorded_state_rnn(cell), (inputs, latents)
         cell, inputs = util.add_support_for_scalar_rnn_inputs(cell, inputs)
         def _make_initial_state():
             if initial_state is not None:
@@ -51,50 +55,34 @@ class VAECore(dist_module.DistCore):
         return _average_runs(samples, cell, inputs, _make_initial_state)
 
     def generate(self,
-                 inputs,  # None | Tensors | Context.
-                 context, # Context
+                 inputs,
                  batch_size=None,  # defaults to hparams.batch_size
                  sequence_size=None,  # defaults to hparams.sequence_size
                  initial_state=None,
-                 inputs_initial_state=None,
-                 context_initial_state=None):
+                 inputs_initial_state=None):
         """Generates a sequence of observations."""
+        inputs = context_mod.as_context(inputs)
         if sequence_size is None:
             sequence_size = util.sequence_size(self._hparams)
-
-        # Allow passing constant Tensors as inputs.
-        if inputs is not None and not isinstance(inputs, context_mod.Context):
-            inputs = context_mod.Constant(inputs, name="inputs")
 
         # Create initial states.
         infer_batch_size = batch_size
         if batch_size is None:
             infer_batch_size = util.batch_size(self._hparams)
-        if inputs is not None and inputs_initial_state is None:
+        if inputs_initial_state is None:
             inputs_initial_state = inputs.initial_state(infer_batch_size)
             if batch_size is None:
                 infer_batch_size = util.batch_size_from_nested_tensors(
                     inputs_initial_state)
-        if context_initial_state is None:
-            context_initial_state = context.initial_state(infer_batch_size)
-            if batch_size is None:
-                infer_batch_size = util.batch_size_from_nested_tensors(
-                    context_initial_state)
         if initial_state is None:
             initial_state = self.initial_state(infer_batch_size)
 
-        # Chain inputs with context.
-        if inputs is not None:
-            context = context_mod.Chain([inputs, context])
-            context_initial_state = (inputs_initial_state,
-                                     context_initial_state)
-
         cell = util.state_recording_rnn(self.samples)
         cell_output_observations = lambda out: out[0]
-        return context.drive_rnn(
+        return inputs.drive_rnn(
             cell,
             sequence_size=sequence_size,
-            initial_state=context_initial_state,
+            initial_state=inputs_initial_state,
             cell_initial_state=initial_state,
             cell_output_dtype=(self.event_dtype, self.state_dtype),
             cell_output_observations=cell_output_observations)

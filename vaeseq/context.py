@@ -6,8 +6,41 @@ import tensorflow as tf
 from . import util
 
 
+def as_context(context, name=None):
+    """Takes a None | Tensors | Context and returns a Context."""
+    if context is None:
+        raise ValueError("Please supply a Context or a set of nested tensors.")
+    if isinstance(context, Context):
+        return context
+    return Constant(context, name=name)
+
+
+def as_tensors(context, observed):
+    """Takes None | Tensors | Context and returns Tensors."""
+    if context is None:
+        raise ValueError("Please supply a Context or a set of nested tensors.")
+    if isinstance(context, Context):
+        context = context.from_observations(observed)
+    return context
+
+
+def _from_observations_cache_key(observations, initial_state):
+    """Cache key used to memoize repeated calls to Context.from_observations."""
+    flat_obs = snt.nest.flatten(observations)
+    obs_names = tuple([obs.name for obs in flat_obs])
+    state_names = None
+    if initial_state is not None:
+        flat_state = snt.nest.flatten(initial_state)
+        state_names = tuple([st.name for st in flat_state])
+    return (obs_names, state_names)
+
+
 class Context(snt.RNNCore):
     """Context interface."""
+
+    def __init__(self, name=None):
+        super(Context, self).__init__(name=name)
+        self._from_observations_cache = {}
 
     @abc.abstractproperty
     def output_size(self):
@@ -85,35 +118,31 @@ class Context(snt.RNNCore):
         util.set_tensor_shapes(outputs, cell.output_size, add_batch_dims=2)
         return outputs
 
-    def from_observations(self, inputs, observed, initial_state=None):
+    def from_observations(self, observed, initial_state=None):
         """Generate contexts for a static sequence of observations."""
+        cache_key = _from_observations_cache_key(observed, initial_state)
+        if cache_key in self._from_observations_cache:
+            return self._from_observations_cache[cache_key]
         with self._enter_variable_scope():
             with tf.name_scope("from_observations"):
                 batch_size = util.batch_size_from_nested_tensors(observed)
                 if initial_state is None:
                     initial_state = self.initial_state(batch_size)
-                def _step(input_obs, state):
-                    if inputs is None:
-                        input_, obs = None, input_obs
-                    else:
-                        input_, obs = input_obs
-                    ctx, state = self(input_, state)
+                def _step(obs, state):
+                    ctx, state = self(None, state)
                     state = self.observe(obs, state)
                     return ctx, state
                 cell = util.WrapRNNCore(
                     _step,
                     state_size=self.state_size,
                     output_size=self.output_size)
-                if inputs is None:
-                    input_obs = observed
-                else:
-                    input_obs = (inputs, observed)
-                cell, input_obs = util.add_support_for_scalar_rnn_inputs(
-                    cell, input_obs)
+                cell, observed = util.add_support_for_scalar_rnn_inputs(
+                    cell, observed)
                 contexts, _ = util.heterogeneous_dynamic_rnn(
-                    cell, input_obs,
+                    cell, observed,
                     initial_state=initial_state,
                     output_dtypes=self.output_dtype)
+                self._from_observations_cache[cache_key] = contexts
                 return contexts
 
 
@@ -122,6 +151,7 @@ class Constant(Context):
 
     def __init__(self, tensors, name=None):
         super(Constant, self).__init__(name=name)
+        self._batch_size = util.batch_size_from_nested_tensors(tensors)
         self._sequence_size = util.sequence_size_from_nested_tensors(tensors)
         self._tensors = tensors
 
@@ -141,6 +171,10 @@ class Constant(Context):
     @property
     def state_dtype(self):
         return tf.int32
+
+    def initial_state(self, batch_size):
+        del batch_size  # Ignore the requested batch size.
+        return super(Constant, self).initial_state(self._batch_size)
 
     def observe(self, observation, state):
         del observation  # Not used.

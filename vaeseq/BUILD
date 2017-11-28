@@ -121,6 +121,7 @@ py_test(
     srcs = ["model_test.py"],
     deps = [
         ":codec",
+        ":context",
         ":hparams",
         ":model",
         ":util",

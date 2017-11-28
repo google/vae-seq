@@ -30,10 +30,10 @@ class Model(model_mod.ModelBase):
     def _make_decoder(self):
         return codec_mod.ObsDecoder(self.hparams)
 
-    def _make_inputs(self):
+    def _make_agent(self):
         return agent_mod.TrainableAgent(self.hparams, self.encoder)
 
-    def _make_context(self):
+    def _make_feedback(self):
         # Inputs are agent action logits; pass them through as context.
         input_encoder = codec_mod.InputEncoder(self.hparams)
         return context_mod.EncodeObserved(self.encoder,
@@ -44,9 +44,9 @@ class Model(model_mod.ModelBase):
         cell = self._env
         cell = util.input_recording_rnn(
             cell,
-            input_size=self.inputs.output_size)
+            input_size=self.agent.output_size)
         cell_output_dtype = (self.decoder.event_dtype,
-                             self.inputs.output_dtype)
+                             self.agent.output_dtype)
         cell_output_observations = lambda out: out[0]
         sequence_size = util.sequence_size(self.hparams)
         def _drive_env(agent, batch_size):
@@ -63,7 +63,7 @@ class Model(model_mod.ModelBase):
         batch_size = util.batch_size(self.hparams)
         train_batch_size = batch_size // 2
         random_batch_size = batch_size - train_batch_size
-        inputs1, observed1 = _drive_env(self.inputs, train_batch_size)
+        inputs1, observed1 = _drive_env(self.agent, train_batch_size)
         inputs2, observed2 = _drive_env(agent_mod.RandomAgent(self.hparams),
                                         random_batch_size)
         tf.summary.histogram("actions", tf.argmax(inputs1, axis=-1))
@@ -83,7 +83,7 @@ class Model(model_mod.ModelBase):
         global_step = tf.train.get_or_create_global_step()
         loss = train_mod.ELBOLoss(self.hparams, self.vae)
         def _variables():
-            agent_vars = set(self.inputs.get_variables())
+            agent_vars = set(self.agent.get_variables())
             return [var for var in tf.trainable_variables()
                     if var not in agent_vars]
         return train_mod.Trainer(self.hparams, global_step=global_step,
@@ -93,10 +93,10 @@ class Model(model_mod.ModelBase):
     def _make_agent_trainer(self):
         global_step = None  # Do not increment global step twice per turn.
         loss = train_mod.RewardLoss(
-            self.hparams, self.inputs, self.context, self.vae,
+            self.hparams, self.inputs, self.vae,
             reward=lambda observed: observed["score"])
         return train_mod.Trainer(self.hparams, global_step=global_step,
-                                 loss=loss, variables=self.inputs.get_variables,
+                                 loss=loss, variables=self.agent.get_variables,
                                  name="agent_trainer")
 
     def _make_trainer(self):

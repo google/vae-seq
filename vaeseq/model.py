@@ -76,19 +76,19 @@ class ModelBase(object):
             return self._make_decoder()
 
     @util.lazy_property
-    def context(self):
-        with self.name_scope("context"):
-            return self._make_context()
+    def feedback(self):
+        with self.name_scope("feedback"):
+            return self._make_feedback()
+
+    @util.lazy_property
+    def agent(self):
+        with self.name_scope("agent"):
+            return self._make_agent()
 
     @util.lazy_property
     def inputs(self):
         with self.name_scope("inputs"):
-            inputs = self._make_inputs()
-            if inputs is None:
-                return None
-            if isinstance(inputs, context_mod.Context):
-                return inputs
-            return context_mod.Constant(inputs)
+            return self._make_full_input_context(self.agent)
 
     @util.lazy_property
     def trainer(self):
@@ -103,7 +103,8 @@ class ModelBase(object):
     def dataset(self, dataset, name=None):
         """Returns inputs and observations for the given dataset."""
         with self.name_scope("dataset", name):
-            return self._make_dataset(dataset)
+            inputs, observed = self._make_dataset(dataset)
+            return self._make_full_input_context(inputs), observed
 
     def training_session(self, hooks=None):
         scaffold = self._make_scaffold()
@@ -136,10 +137,8 @@ class ModelBase(object):
         """Calculates the mean log-prob for the given sequences."""
         with tf.name_scope("evaluate"):
             inputs, observed = self.dataset(dataset)
-            contexts = self.context.from_observations(inputs=inputs,
-                                                      observed=observed)
             log_probs = self.vae.evaluate(
-                contexts, observed,
+                inputs, observed,
                 samples=self.hparams.log_prob_samples)
             mean_log_prob, update = tf.metrics.mean(log_probs)
         hooks = [tf.train.LoggingTensorHook({"log_prob": mean_log_prob},
@@ -158,32 +157,28 @@ class ModelBase(object):
         """Trains/continues training the model."""
         global_step = tf.train.get_or_create_global_step()
         inputs, observed = self.dataset(dataset, name="train_dataset")
-        contexts = self.context.from_observations(inputs=inputs,
-                                                  observed=observed)
-        train_op, debug = self.trainer(inputs, contexts, observed)
+        train_op, debug = self.trainer(inputs, observed)
         debug["global_step"] = global_step
         hooks = [tf.train.LoggingTensorHook(debug, every_n_secs=60.)]
         if self._session_params.log_dir:
             # Add metric summaries to be computed at a slower rate.
             slow_summaries = []
-            def _add_to_slow_summaries(name, contexts, observed):
+            def _add_to_slow_summaries(name, inputs, observed):
                 """Creates a self-updating metric summary op."""
                 with tf.name_scope(name):
                     log_probs = self.vae.evaluate(
-                        contexts, observed,
+                        inputs, observed,
                         samples=self.hparams.log_prob_samples)
                     mean, update = tf.metrics.mean(log_probs)
                     with tf.control_dependencies([update]):
                         slow_summaries.append(
                             tf.summary.scalar("mean_log_prob",
                                               mean, collections=[]))
-            _add_to_slow_summaries("train_eval", contexts, observed)
+            _add_to_slow_summaries("train_eval", inputs, observed)
             if valid_dataset is not None:
                 vinputs, vobserved = self.dataset(valid_dataset,
                                                   name="valid_dataset")
-                vcontexts = self.context.from_observations(inputs=vinputs,
-                                                           observed=vobserved)
-                _add_to_slow_summaries("valid_eval", vcontexts, vobserved)
+                _add_to_slow_summaries("valid_eval", vinputs, vobserved)
             hooks.append(tf.train.SummarySaverHook(
                 save_steps=100,
                 output_dir=self._session_params.log_dir,
@@ -192,7 +187,6 @@ class ModelBase(object):
             # Add sample generated sequences.
             generated, _unused_latents = self.vae.generate(
                 inputs=inputs,
-                context=self.context,
                 batch_size=util.batch_size_from_nested_tensors(observed),
                 sequence_size=util.sequence_size_from_nested_tensors(observed))
             hooks.append(tf.train.SummarySaverHook(
@@ -216,14 +210,19 @@ class ModelBase(object):
 
     def generate(self):
         """Generates sequences from a trained model."""
-        generated, _unused_latents = self.vae.generate(
-            inputs=self.inputs,
-            context=self.context)
+        generated, _unused_latents = self.vae.generate(self.inputs)
         rendered = self._render(generated)
         with self.eval_session() as sess:
             batch = sess.run(rendered)
             for sequence in batch:
                 yield sequence
+
+    def _make_full_input_context(self, inputs):
+        """Chains agent with feedback produce the VAE input."""
+        if inputs is None:
+            return self.feedback
+        inputs = context_mod.as_context(inputs)
+        return context_mod.Chain([inputs, self.feedback])
 
     def _make_scaffold(self):
         local_init_op = tf.group(
@@ -236,13 +235,13 @@ class ModelBase(object):
         """Returns a rendering of the modeled observation for output."""
         return observed
 
-    def _make_context(self):
-        """Constructs the Context."""
+    def _make_feedback(self):
+        """Constructs the feedback Context."""
         # Default to an encoding of the previous observation..
         return context_mod.EncodeObserved(self.encoder)
 
-    def _make_inputs(self):
-        """Constructs input Context or tensors.."""
+    def _make_agent(self):
+        """Constructs a Context used for generating inputs."""
         return None  # No inputs.
 
     def _make_trainer(self):

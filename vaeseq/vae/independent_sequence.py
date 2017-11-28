@@ -4,7 +4,7 @@ Notation:
  - z_1:T are hidden states, random variables.
  - d_1:T, e_1:T, and f_1:T are deterministic RNN outputs.
  - x_1:T are the observed states.
- - c_1:T are per-timestep contexts.
+ - c_1:T are per-timestep inputs.
 
         Generative model               Inference model
       =====================         =====================
@@ -43,10 +43,10 @@ class IndependentSequence(vae_module.VAECore):
     def state_size(self):
         return (self._d_core.state_size, self._q_z.event_size)
 
-    def _build(self, context, state):
+    def _build(self, input_, state):
         d_state, latent = state
         d_out, d_state = self._d_core(
-            util.concat_features((context, latent)), d_state)
+            util.concat_features((input_, latent)), d_state)
         return self._obs_decoder(d_out), d_state
 
     def _next_state(self, d_state, event=None):
@@ -59,13 +59,13 @@ class IndependentSequence(vae_module.VAECore):
         return self._next_state(
             self._d_core.initial_state(batch_size), event=None)
 
-    def infer_latents(self, contexts, observed):
+    def _infer_latents(self, inputs, observed):
         hparams = self._hparams
         batch_size = util.batch_size_from_nested_tensors(observed)
         enc_observed = snt.BatchApply(self._obs_encoder, n_dims=2)(observed)
         e_outs, _ = tf.nn.dynamic_rnn(
             self._e_core,
-            util.concat_features((contexts, enc_observed)),
+            util.concat_features((inputs, enc_observed)),
             initial_state=self._e_core.initial_state(batch_size))
         f_outs, _ = util.reverse_dynamic_rnn(
             self._f_core,
@@ -82,7 +82,7 @@ class IndependentSequence(vae_module.VAECore):
         divs = util.calc_kl(hparams, latents, q_zs, p_zs)
         (_unused_d_outs, d_states), _ = tf.nn.dynamic_rnn(
             util.state_recording_rnn(self._d_core),
-            util.concat_features((contexts, latents)),
+            util.concat_features((inputs, latents)),
             initial_state=self._d_core.initial_state(batch_size))
         return (d_states, latents), divs
 

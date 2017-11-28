@@ -10,16 +10,16 @@ from vaeseq import util
 from vaeseq import vae as vae_mod
 
 
-def _context_and_vae(hparams):
+def _inputs_and_vae(hparams):
     """Constructs a VAE."""
     obs_encoder = codec.MLPObsEncoder(hparams)
     obs_decoder = codec.MLPObsDecoder(
         hparams,
         codec.BernoulliDecoder(squeeze_input=True),
         param_size=1)
-    context = context_mod.EncodeObserved(obs_encoder)
+    inputs = context_mod.EncodeObserved(obs_encoder)
     vae = vae_mod.make(hparams, obs_encoder, obs_decoder)
-    return context, vae
+    return inputs, vae
 
 
 def _observed(hparams):
@@ -28,31 +28,29 @@ def _observed(hparams):
                     dtype=tf.int32, name="test_obs")
 
 
-def _inf_tensors(hparams, context, vae):
+def _inf_tensors(hparams, inputs, vae):
     """Simple inference graph."""
     with tf.name_scope("inf"):
         observed = _observed(hparams)
-        contexts = context.from_observations(inputs=None, observed=observed)
-        latents, divs = vae.infer_latents(contexts, observed)
-        log_probs = vae.evaluate(contexts, observed, latents=latents)
+        latents, divs = vae.infer_latents(inputs, observed)
+        log_probs = vae.evaluate(inputs, observed, latents=latents)
         elbo = tf.reduce_sum(log_probs - divs)
     return [observed, latents, divs, log_probs, elbo]
 
 
-def _gen_tensors(hparams, context, vae):
+def _gen_tensors(hparams, inputs, vae):
     """Samples observations and latent variables from the VAE."""
     del hparams  # Unused, just passed for consistency.
     with tf.name_scope("gen"):
-        generated, latents = vae.generate(inputs=None, context=context)
+        generated, latents = vae.generate(inputs)
     return [generated, latents]
 
 
-def _eval_tensors(hparams, context, vae):
+def _eval_tensors(hparams, inputs, vae):
     """Calculates the log-probabilities of the observations."""
     with tf.name_scope("eval"):
         observed = _observed(hparams)
-        contexts = context.from_observations(inputs=None, observed=observed)
-        log_probs = vae.evaluate(contexts, observed, samples=100)
+        log_probs = vae.evaluate(inputs, observed, samples=100)
     return [log_probs]
 
 
@@ -116,11 +114,11 @@ def _test_assertions(inf_tensors, gen_tensors, eval_tensors):
     return assertions
 
 
-def _all_tensors(hparams, context, vae):
+def _all_tensors(hparams, inputs, vae):
     """All tensors to evaluate in tests."""
-    gen_tensors = _gen_tensors(hparams, context, vae)
-    inf_tensors = _inf_tensors(hparams, context, vae)
-    eval_tensors = _eval_tensors(hparams, context, vae)
+    gen_tensors = _gen_tensors(hparams, inputs, vae)
+    inf_tensors = _inf_tensors(hparams, inputs, vae)
+    eval_tensors = _eval_tensors(hparams, inputs, vae)
     assertions = _test_assertions(inf_tensors, gen_tensors, eval_tensors)
     all_tensors = inf_tensors + gen_tensors + eval_tensors + assertions
     return [x for x in all_tensors if x is not None]
@@ -131,8 +129,8 @@ class VAETest(tf.test.TestCase):
     def _test_vae(self, vae_type):
         """Make sure that all tensors and assertions evaluate without error."""
         hparams = hparams_mod.make_hparams(vae_type=vae_type)
-        context, vae = _context_and_vae(hparams)
-        tensors = _all_tensors(hparams, context, vae)
+        inputs, vae = _inputs_and_vae(hparams)
+        tensors = _all_tensors(hparams, inputs, vae)
         with self.test_session() as sess:
             sess.run(tf.global_variables_initializer())
             sess.run(tensors)

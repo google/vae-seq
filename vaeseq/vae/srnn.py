@@ -9,7 +9,7 @@ Notation:
  - z_0:T are hidden states, random variables
  - d_1:T and e_1:T are deterministic RNN outputs
  - x_1:T are the observed states
- - c_1:T are the per-timestep contexts
+ - c_1:T are the per-timestep inputs
 
     Generative model                Inference model
   =====================          =====================
@@ -48,9 +48,9 @@ class SRNN(vae_module.VAECore):
     def state_size(self):
         return (self._d_core.state_size, self._latent_p.event_size)
 
-    def _build(self, context, state):
+    def _build(self, input_, state):
         d_state, latent = state
-        d_out, d_state = self._d_core(util.concat_features(context), d_state)
+        d_out, d_state = self._d_core(util.concat_features(input_), d_state)
         latent_params = self._latent_p(d_out, latent)
         return self._obs_decoder((d_out, latent)), (d_state, latent_params)
 
@@ -71,18 +71,18 @@ class SRNN(vae_module.VAECore):
         latent_params = self._latent_p(latent_inputs)
         return self._next_state((d_state, latent_params), event=None)
 
-    def infer_latents(self, contexts, observed):
+    def _infer_latents(self, inputs, observed):
         hparams = self._hparams
         batch_size = util.batch_size_from_nested_tensors(observed)
         d_initial, z_initial = self.initial_state(batch_size)
         (d_outs, d_states), _ = tf.nn.dynamic_rnn(
             util.state_recording_rnn(self._d_core),
-            util.concat_features(contexts),
+            util.concat_features(inputs),
             initial_state=d_initial)
         enc_observed = snt.BatchApply(self._obs_encoder, n_dims=2)(observed)
         e_outs, _ = util.reverse_dynamic_rnn(
             self._e_core,
-            util.concat_features((enc_observed, contexts)),
+            util.concat_features((enc_observed, inputs)),
             initial_state=self._e_core.initial_state(batch_size))
 
         def _inf_step(d_e_outputs, prev_latent):

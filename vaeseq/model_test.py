@@ -3,8 +3,10 @@
 import itertools
 import os.path
 import tensorflow as tf
+import sonnet as snt
 
 from vaeseq import codec
+from vaeseq import context as context_mod
 from vaeseq import hparams as hparams_mod
 from vaeseq import model as model_mod
 from vaeseq import util
@@ -35,15 +37,16 @@ class ModelTest(tf.test.TestCase):
         return self.model.evaluate(self.train_dataset, num_steps=20)
 
     def test_inputs(self):
-        train_inputs, observed = self.model.dataset(
-            self.train_dataset)
-        self.assertEqual(train_inputs is None, self.model.inputs is None)
-        if self.model.inputs is not None:
-            gen_inputs = self.model.inputs.from_observations(inputs=None,
-                                                             observed=observed)
-            self.assertEqual(gen_inputs.dtype, train_inputs.dtype)
-            gen_inputs.get_shape().assert_is_compatible_with(
-                train_inputs.get_shape())
+        train_inputs, observed = self.model.dataset(self.train_dataset)
+        train_inputs = context_mod.as_tensors(train_inputs, observed)
+        gen_inputs = self.model.inputs
+        gen_inputs = context_mod.as_tensors(gen_inputs, observed)
+        with self.model.eval_session() as sess:
+            train_inputs, gen_inputs = sess.run((train_inputs, gen_inputs))
+        def _inputs_compatible(inp1, inp2):
+            self.assertEqual(inp1.dtype, inp2.dtype)
+            self.assertEqual(inp1.shape, inp2.shape)
+        snt.nest.map(_inputs_compatible, train_inputs, gen_inputs)
 
     def test_training_and_eval(self):
         train_debug1 = self._train()

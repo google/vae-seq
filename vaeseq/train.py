@@ -38,8 +38,8 @@ class Trainer(snt.AbstractModule):
                 self._hparams.clip_gradient_norm)
         return gradients_to_variables
 
-    def _build(self, inputs, contexts, observed):
-        loss, debug_tensors = self._loss(inputs, contexts, observed)
+    def _build(self, inputs, observed):
+        loss, debug_tensors = self._loss(inputs, observed)
         variables = self._variables()
         if not variables:
             raise ValueError("No trainable variables found.")
@@ -69,11 +69,11 @@ class Group(snt.AbstractModule):
         super(Group, self).__init__(name=name)
         self._trainers = trainers
 
-    def _build(self, inputs, contexts, observed):
+    def _build(self, inputs, observed):
         train_ops = []
         debug_tensors = {}
         for trainer in self._trainers:
-            train_op, debug = trainer(inputs, contexts, observed)
+            train_op, debug = trainer(inputs, observed)
             train_ops.append(train_op)
             debug_tensors.update(debug)
         return tf.group(*train_ops), debug_tensors
@@ -87,14 +87,12 @@ class ELBOLoss(snt.AbstractModule):
         self._hparams = hparams
         self._vae = vae
 
-    def _build(self, inputs, contexts, observed):
-        del inputs  # Not used.
-
+    def _build(self, inputs, observed):
         debug_tensors = {}
         scalar_summary = functools.partial(_scalar_summary, debug_tensors)
 
-        latents, divs = self._vae.infer_latents(contexts, observed)
-        log_probs = self._vae.evaluate(contexts, observed, latents=latents)
+        latents, divs = self._vae.infer_latents(inputs, observed)
+        log_probs = self._vae.evaluate(inputs, observed, latents=latents)
         log_prob = tf.reduce_mean(log_probs)
         divergence = tf.reduce_mean(divs)
         scalar_summary("log_prob", log_prob)
@@ -118,20 +116,18 @@ class ELBOLoss(snt.AbstractModule):
 class RewardLoss(snt.AbstractModule):
     """Sums component losses."""
 
-    def __init__(self, hparams, agent, context, vae, reward, name=None):
+    def __init__(self, hparams, inputs, vae, reward, name=None):
         super(RewardLoss, self).__init__(name=name)
-        self._agent = agent
-        self._context = context
+        self._inputs = inputs
         self._vae = vae
         self._reward = reward
 
-    def _build(self, inputs, contexts, observed):
-        del inputs, contexts, observed  # We only use the generated reward.
+    def _build(self, inputs, observed):
+        del inputs, observed  # We only use the generated reward.
         debug_tensors = {}
         scalar_summary = functools.partial(_scalar_summary, debug_tensors)
 
-        generated = self._vae.generate(inputs=self._agent,
-                                       context=self._context)[0]
+        generated = self._vae.generate(self._inputs)[0]
         mean_reward = tf.reduce_mean(self._reward(generated))
         scalar_summary("mean_reward", mean_reward)
         #loss = -self._neg_log_reward_dist.log_prob(-tf.log(mean_reward + 1e-5))
