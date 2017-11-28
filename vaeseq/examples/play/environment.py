@@ -1,6 +1,7 @@
 """Environment that runs OpenAI Gym games."""
 
 import threading
+import time
 
 import gym
 import numpy as np
@@ -17,8 +18,11 @@ class Environment(snt.RNNCore):
         super(Environment, self).__init__(name=name)
         self._hparams = hparams
         self._games = {}
+        self._games_lock = threading.Lock()
         self._next_id = 1
         self._id_lock = threading.Lock()
+        self._step_time = None
+        self._render_thread = None
 
     @property
     def output_size(self):
@@ -49,10 +53,13 @@ class Environment(snt.RNNCore):
                 first_id = self._next_id
                 self._next_id += batch_size
                 game_ids = range(first_id, self._next_id)
+            updates = []
             for game_id in game_ids:
                 game = gym.make(self._hparams.game)
                 game.reset()
-                self._games[game_id] = game
+                updates.append((game_id, game))
+            with self._games_lock:
+                self._games.update(updates)
             return np.asarray(game_ids, dtype=np.int64)
 
         state, = tf.py_func(_make_games, [batch_size], [tf.int64])
@@ -67,12 +74,25 @@ class Environment(snt.RNNCore):
             score = np.zeros(len(state), dtype=np.float32)
             output = np.zeros([len(state)] + self._hparams.game_output_size,
                               dtype=np.float32)
-            for i in np.nonzero(state)[0]:
-                game = self._games[state[i]]
+            games = [None] * len(state)
+            with self._games_lock:
+                for i, game_id in enumerate(state):
+                    if game_id:
+                        games[i] = self._games[game_id]
+            finished_games = []
+            for i, game in enumerate(games):
+                if game is None:
+                    continue
                 output[i], score[i], game_over, _ = game.step(actions[i])
                 if game_over:
-                    del self._games[state[i]]
+                    finished_games.append(state[i])
                     state[i] = 0
+            if finished_games:
+                with self._games_lock:
+                    for game_id in finished_games:
+                        del self._games[game_id]
+            if self._render_thread is not None:
+                time.sleep(0.1)
             return output, score, state
 
         output, score, state = tf.py_func(
@@ -84,3 +104,25 @@ class Environment(snt.RNNCore):
         util.set_tensor_shapes(output, self.output_size, add_batch_dims=1)
         util.set_tensor_shapes(state, self.state_size, add_batch_dims=1)
         return output, state
+
+    def start_render_thread(self):
+        if self._render_thread is not None:
+            return self._render_thread
+        self._render_thread = threading.Thread(target=self._render_games_loop)
+        self._render_thread.start()
+
+    def stop_render_thread(self):
+        if self._render_thread is None:
+            return
+        tmp = self._render_thread
+        self._render_thread = None
+        tmp.join()
+
+    def _render_games_loop(self):
+        while (self._render_thread is not None and
+               threading.current_thread().ident == self._render_thread.ident):
+            with self._games_lock:
+                games = list(self._games.values())
+            for game in games:
+                game.render()
+            time.sleep(0.05)

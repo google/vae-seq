@@ -21,7 +21,7 @@ class Model(model_mod.ModelBase):
     """Putting everything together."""
 
     def __init__(self, hparams, session_params):
-        self._env = environment.Environment(hparams)
+        self.env = environment.Environment(hparams)
         super(Model, self).__init__(hparams, session_params)
 
     def _make_encoder(self):
@@ -41,7 +41,7 @@ class Model(model_mod.ModelBase):
 
     def _make_dataset(self, dataset):
         del dataset  #  Not used.
-        cell = self._env
+        cell = self.env
         cell = util.input_recording_rnn(
             cell,
             input_size=self.agent.output_size)
@@ -50,7 +50,7 @@ class Model(model_mod.ModelBase):
         cell_output_observations = lambda out: out[0]
         sequence_size = util.sequence_size(self.hparams)
         def _drive_env(agent, batch_size):
-            cell_initial_state = self._env.initial_state(batch_size)
+            cell_initial_state = self.env.initial_state(batch_size)
             observed, inputs = agent.drive_rnn(
                 cell=cell,
                 sequence_size=sequence_size,

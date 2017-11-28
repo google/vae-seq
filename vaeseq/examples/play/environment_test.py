@@ -30,7 +30,6 @@ class EnvironmentTest(tf.test.TestCase):
             observed = sess.run(observed)
             outputs = observed["output"]
             game_over = observed["game_over"]
-            print("ZZZ", game_over, observed, outputs)
             scores = observed["score"]
             self.assertTrue(np.all(scores[game_over > 0] == 1))
             nonzero_gameover_scores = scores[np.nonzero(scores[game_over > 0])]
