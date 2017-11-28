@@ -213,9 +213,10 @@ class ModelBase(object):
         generated, _unused_latents = self.vae.generate(self.inputs)
         rendered = self._render(generated)
         with self.eval_session() as sess:
-            batch = sess.run(rendered)
-            for sequence in batch:
-                yield sequence
+            while True:
+                batch = sess.run(rendered)
+                for sequence in batch:
+                    yield sequence
 
     def _make_full_input_context(self, inputs):
         """Chains agent with feedback produce the VAE input."""
