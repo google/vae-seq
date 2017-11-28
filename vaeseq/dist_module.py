@@ -21,7 +21,10 @@ class DistModule(snt.AbstractModule):
 
     @abc.abstractmethod
     def dist(self, params, name=None):
-        """Constructs a Distribution parameterized by the module output."""
+        """Constructs a Distribution parameterized by the module output.
+        This method is separate from _build (which returns Tensors)
+        to allow batch application: module.dist(BatchApply(module)(...)).
+        """
 
 
 class DistCore(DistModule):
