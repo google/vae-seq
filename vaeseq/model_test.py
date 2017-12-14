@@ -72,7 +72,8 @@ class MockModel(model_mod.ModelBase):
         return codec.BatchDecoder(
             codec.MLPObsDecoder(
                 self.hparams,
-                codec.NormalDecoder(self.hparams),
+                codec.NormalDecoder(
+                    positive_projection=util.positive_projection(self.hparams)),
                 param_size=4),
             event_size=[2])
 

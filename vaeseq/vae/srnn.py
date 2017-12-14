@@ -52,7 +52,8 @@ class SRNN(vae_module.VAECore):
         d_state, latent = state
         d_out, d_state = self._d_core(util.concat_features(input_), d_state)
         latent_params = self._latent_p(d_out, latent)
-        return self._obs_decoder((d_out, latent)), (d_state, latent_params)
+        return (self._obs_decoder(util.concat_features((d_out, latent))),
+                (d_state, latent_params))
 
     def _next_state(self, state_arg, event=None):
         del event  # Not used.
