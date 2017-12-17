@@ -17,7 +17,7 @@ class ContextTest(tf.test.TestCase):
             self.assertAllEqual(contexts, [[1, 2, 3, 0, 0]])
 
     def testEncodeObserved(self):
-        encoder = codec.FlattenObsEncoder(input_size=tf.TensorShape([1]))
+        encoder = codec.FlattenEncoder(input_size=tf.TensorShape([1]))
         context = context_mod.EncodeObserved(encoder)
         observed = tf.constant([[[1.], [2.], [3.]]])
         contexts = context.from_observations(observed)
@@ -28,7 +28,7 @@ class ContextTest(tf.test.TestCase):
     def testChain(self):
         inputs = tf.constant([[[10.], [20.]]])
         observed = tf.constant([[[1.], [2.], [3.]]])
-        encoder = codec.FlattenObsEncoder(input_size=tf.TensorShape([1]))
+        encoder = codec.FlattenEncoder(input_size=tf.TensorShape([1]))
         context = context_mod.Chain([
             context_mod.as_context(inputs),
             context_mod.EncodeObserved(encoder, input_encoder=encoder),

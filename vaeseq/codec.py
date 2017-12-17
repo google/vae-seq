@@ -16,11 +16,11 @@ class EncoderSequence(snt.Sequential):
         return self.layers[-1].output_size
 
 
-class FlattenObsEncoder(snt.AbstractModule):
-    """Forwards the (flattened) input observation."""
+class FlattenEncoder(snt.AbstractModule):
+    """Forwards the flattened input."""
 
     def __init__(self, input_size=None, name=None):
-        super(FlattenObsEncoder, self).__init__(name=name)
+        super(FlattenEncoder, self).__init__(name=name)
         self._input_size = None
         if input_size is not None:
             self._merge_input_sizes(input_size)
@@ -48,12 +48,12 @@ class FlattenObsEncoder(snt.AbstractModule):
         return tf.TensorShape([flattened_size])
 
 
-    def _build(self, obs):
-        input_sizes = snt.nest.map(lambda obs_i: obs_i.get_shape()[1:], obs)
+    def _build(self, inp):
+        input_sizes = snt.nest.map(lambda inp_i: inp_i.get_shape()[1:], inp)
         self._merge_input_sizes(input_sizes)
         flatten = snt.BatchFlatten(preserve_dims=1)
-        flat_obs = snt.nest.map(lambda obs_i: tf.to_float(flatten(obs_i)), obs)
-        ret = util.concat_features(flat_obs)
+        flat_inp = snt.nest.map(lambda inp_i: tf.to_float(flatten(inp_i)), inp)
+        ret = util.concat_features(flat_inp)
         util.set_tensor_shapes(ret, self.output_size, add_batch_dims=1)
         return ret
 
@@ -63,7 +63,7 @@ def MLPObsEncoder(hparams, name=None):
     name = name or "mlp_obs_encoder"
     mlp = util.make_mlp(hparams, hparams.obs_encoder_fc_layers,
                         name=name + "/mlp")
-    return EncoderSequence([FlattenObsEncoder(), mlp], name=name)
+    return EncoderSequence([FlattenEncoder(), mlp], name=name)
 
 
 class DecoderSequence(dist_module.DistModule):

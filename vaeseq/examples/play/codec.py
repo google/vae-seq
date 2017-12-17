@@ -13,7 +13,7 @@ from vaeseq import util
 ObsEncoder = codec.MLPObsEncoder
 
 
-class InputEncoder(codec.FlattenObsEncoder):
+class InputEncoder(codec.FlattenEncoder):
     """Passes through the input action logits."""
 
     def __init__(self, hparams, name=None):
