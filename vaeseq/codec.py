@@ -147,7 +147,7 @@ class BetaDecoder(dist_module.DistModule):
         return tf.TensorShape([])
 
     def _build(self, inputs):
-        conc1, conc0 = inputs
+        conc1, conc0 = tf.split(inputs, 2, axis=-1)
         if self._positive_projection is not None:
             conc1 = self._positive_projection(conc1)
             conc0 = self._positive_projection(conc0)

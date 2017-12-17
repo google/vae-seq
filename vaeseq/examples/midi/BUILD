@@ -34,6 +34,7 @@ py_library(
     deps = [
         ":dataset",
         "//vaeseq:codec",
+        "//vaeseq:context",
         "//vaeseq:model",
         "//vaeseq:util",
     ],

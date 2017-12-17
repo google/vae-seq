@@ -3,6 +3,7 @@
 import abc
 import sonnet as snt
 import tensorflow as tf
+
 from . import util
 
 
@@ -281,3 +282,39 @@ class EncodeObserved(Context):
         else:
             ret = (self._input_encoder(input_), state)
         return ret, state
+
+
+class Accumulate(Context):
+    """Accumulates the last N observation encodings."""
+
+    def __init__(self, obs_encoder, history_size, history_combiner, name=None):
+        super(Accumulate, self).__init__(name=name)
+        self._obs_encoder = obs_encoder
+        self._history_size = history_size
+        self._history_combiner = history_combiner
+
+    @property
+    def output_size(self):
+        return self._history_combiner.output_size
+
+    @property
+    def state_size(self):
+        obs_size = self._obs_encoder.output_size
+        history_size = tf.TensorShape([self._history_size])
+        return snt.nest.map(lambda size: history_size.concatenate(size),
+                            obs_size)
+
+    @property
+    def state_dtype(self):
+        return snt.nest.map(lambda _: tf.float32, self.state_size)
+
+    def observe(self, observation, state):
+        enc_obs = tf.expand_dims(self._obs_encoder(observation), axis=1)
+        return snt.nest.map(
+            lambda hist, obs: tf.concat([hist[:, 1:, :], obs], axis=1),
+            state, enc_obs)
+
+    def _build(self, input_, state):
+        if input_ is not None:
+            raise ValueError("I don't know how to encode any inputs.")
+        return self._history_combiner(state), state

@@ -1,8 +1,8 @@
 """The model for MIDI music.
 
 At each time step, we predict a pair of:
-* 128 independent Beta variables, corresponding to each note.
-* K, a Binomial variable counting the number of notes played.
+* 128 independent Beta variables, assigning scores to each note.
+* K in [0,10], a Categorical variable counting the number of notes played.
 
 When generating music, we emit the top K notes per timestep.
 """
@@ -13,6 +13,7 @@ import numpy as np
 import tensorflow as tf
 
 from vaeseq import codec as codec_mod
+from vaeseq import context as context_mod
 from vaeseq import model as model_mod
 from vaeseq import util
 
@@ -28,25 +29,34 @@ class Model(model_mod.ModelBase):
 
     def _make_decoder(self):
         """Constructs a decoder for a single observation."""
-        # We need 2 * 128 (note beta) + 1 (count binomial) parameters.
+        # We need 2 * 128 (note beta) + 11 (count categorical) parameters.
         params = util.make_mlp(
             self.hparams,
-            self.hparams.obs_decoder_fc_hidden_layers + [128 * 2 + 1])
-        positive_projection = util.positive_projection(self.hparams)
+            self.hparams.obs_decoder_fc_hidden_layers + [128 * 2 + 11])
         def _split_params(inp):
-            conc1, conc0, logits = tf.split(inp, [128, 128, 1], axis=-1)
-            conc1 = positive_projection(conc1) + 1e-4
-            conc0 = positive_projection(conc0) + 1e-4
-            return ((conc1, conc0), logits)
-        single_note_decoder = codec_mod.BetaDecoder()
+            note_params, count_param = tf.split(inp, [128 * 2, 11], axis=-1)
+            return (note_params, count_param)  # Note: returning a tuple.
+        single_note_decoder = codec_mod.BetaDecoder(
+            positive_projection=util.positive_projection(self.hparams))
         notes_decoder = codec_mod.BatchDecoder(
             single_note_decoder, event_size=[128], name="notes_decoder")
-        count_decoder = codec_mod.BinomialDecoder(total_count=128,
-                                                  squeeze_input=True,
-                                                  name="count_decoder")
+        count_decoder = codec_mod.CategoricalDecoder(name="count_decoder")
         full_decoder = codec_mod.GroupDecoder((notes_decoder, count_decoder))
         return codec_mod.DecoderSequence(
             [params, _split_params], full_decoder, name="decoder")
+
+    def _make_feedback(self):
+        """Constructs the feedback Context."""
+        history_combiner = codec_mod.EncoderSequence(
+            [codec_mod.FlattenEncoder(),
+             util.make_mlp(self.hparams,
+                           self.hparams.history_encoder_fc_layers)],
+            name="history_combiner"
+        )
+        return context_mod.Accumulate(
+            obs_encoder=self.encoder,
+            history_size=self.hparams.history_size,
+            history_combiner=history_combiner)
 
     def _make_dataset(self, files):
         dataset = dataset_mod.piano_roll_sequences(
@@ -59,7 +69,7 @@ class Model(model_mod.ModelBase):
         piano_roll = iterator.get_next()
         shape = tf.shape(piano_roll)
         notes = tf.where(piano_roll, tf.fill(shape, 0.95), tf.fill(shape, 0.05))
-        counts = tf.reduce_sum(tf.to_int32(piano_roll), axis=-1)
+        counts = tf.minimum(10, tf.reduce_sum(tf.to_int32(piano_roll), axis=-1))
         observed = (notes, counts)
         inputs = None
         return inputs, observed
@@ -75,8 +85,9 @@ class Model(model_mod.ModelBase):
             piano_roll = np.zeros((len(counts), 128), dtype=np.bool)
             top_notes = np.argsort(notes)
             for roll_t, top_notes_t, k in zip(piano_roll, top_notes, counts):
-                for i in top_notes_t[-k:]:
-                    roll_t[i] = True
+                if k > 0:
+                    for i in top_notes_t[-k:]:
+                        roll_t[i] = True
             rate = self.hparams.rate
             midi = dataset_mod.piano_roll_to_midi(piano_roll, rate)
             wave = midi.synthesize(self.SYNTHESIZED_RATE)
