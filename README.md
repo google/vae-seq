@@ -2,62 +2,98 @@
 
 VAE-Seq is a library for modeling sequences of observations.
 
-## Framing
+## Background
 
-Lets define some terminology to frame the problem. We'd like to model
-a sequence of *observations*. An observation could be a frame in a
-game being played, a window of samples from an audio file, or the
-price of a stock at a certain time.
+One tool that's commonly used to model sequential data is the
+Recurrent Neural Network (RNN), or gated variations of it such as the
+Long Short-Term Memory cell or the Gated Recurrent Unit cell.
 
-Our model for the probability of an observation at a given depends on:
+RNNs in general are essentially trainable transition functions:
+`(input, state) -> (output, state')`, and by themselves don't specify
+a complete model. We additionally need to specify a family of
+distributions that describes our observations; common choices here are
+`Categorical` distributions for discrete observations such as text or
+`Normal` distributions for real-valued observations.
 
-  * *Latent variables*, both deterministic and stochastic.
-  * A *context* that encodes input from the environment.
+The `output` of the RNN specifies the parameters of the observation
+distribution (e.g. the logits of a `Categorical` or the mean and
+variance of a `Normal`). But the size of the RNN `output` and the
+number of parameters that we need don't necessarily match up. To solve
+this, we project `output` into the appropriate shape via a Neural
+Network we'll call a decoder.
 
-The latent variables depend on the generative model, but generally
-they are composed of a deterministic RNN state and a set stochastic
-variables drawn from some easy-to-sample probability distribution.
+And what about the `input` of the RNN? It can be empty, but we might
+want to include side information from the environment (e.g. actions
+when modeling a game or a metronome when modeling
+music). Additionally, the observation from the previous step(s) is
+almost always an important feature to include. Here, we'll use another
+Neural Network we'll call an encoder to summarize the observation
+into a more digestible form.
 
-The context usually encodes information about the previous
-observations, as well as any external inputs. For example, when
-modeling a game, the context might be an encoding of the last few
-frames and the last action that was played.
+Together, these components specify a factored (by time step)
+probability distribution that we can train in the usual way: by
+maximizing the probability of the network weights given the
+observations in your training data and your priors over those
+weights. Once trained, you can use ancestral sampling to generate new
+sequences.
 
-## Components
+## Motivation
 
-The core of the model is one of the VAE implementations defined in
-vaeseq/vae. To construct it, you must supply:
+This library allows you to express the type of model described
+above. It handles the plumbing for you: you define the encoder, the
+decoder, and the observation distribution. The resulting model can
+be trained on a `Dataset` of observation sequences, queried for the
+probability of a given sequence, or queried to generate new sequences.
 
-  * An *Agent* (see: `vaeseq/agent.py`) that receives observations
-    and supplies contexts.
-  * An *Encoder*, a Sonnet module that takes an observation and
-    outputs a flat representation.
-  * A *Decoder*, a `DistModule` (see: `vaeseq/dist_module.py`) that
-    produces probability distributions over observations.
+But the model above also has a limitation: the family of observation
+distributions we pick is the only source of non-determinism in the
+model. If it can't express the true distribution of observations, the
+model won't be able to learn or generate the true range of observation
+sequences. For example, consider a sequence of black/white images. If
+we pick the observation distribution to be a set of independent
+`Bernoulli` distributions over pixel values, the first generated image
+would always look like a noisy average over images in the training
+set. Subsequent images might get more creative since they are
+conditioned on a noisy input, but that depends on how images vary
+between steps in the training data.
 
-## Generative Models
+The issue in the example above is that the observation distribution we
+picked wasn't expressive enough: pixels in an image aren't
+independent. One way to fix this is to design very expressive
+observation distributions that can model images. Another way is to
+condition the simple distribution on a latent variable to produce a
+hierarchical output distribution. This latter type of model is known
+as a Variational Auto encoder (VAE).
 
-We implement three generative models (see: `vaeseq/vae`):
+There are different ways to incorporate latent variables in a
+sequential model (see the supported architectures below) but the
+general approach we take here is to view the RNN `state` as a
+collection of stochastic and deterministic variables.
+
+## Usage
+
+To define a model, subclass `ModelBase` to define an encoder, a
+decoder, and the output distribution. The decoder and output
+distribution are packaged together into a `DistModule` (see:
+[vaeseq/codec.py](vaeseq/codec.py)).
+
+The following model architectures are currently available (see:
+[vaeseq/vae](vaeseq/vae)):
 
   * An RNN with no latent variables other than a deterministic state.
-  * A VAE where the stochastic latent variables are independent.
+  * A VAE where the stochastic latent variables are independent across
+    time steps.
   * An implementation of SRNN (https://arxiv.org/abs/1605.07571)
 
-To train these models, you may use `TrainOps` (see:
-`vaeseq/train.py`). It accepts a sequences of contexts and
-observations and returns an operation that must be run repeatedly to
-train the model.
-
-Once trained, you can sample sequences by running the model's
-*GenCore* (see: `vaeseq/vae/base.py`), which alternates between
-running the agent to get a context and sampling from the generative
-model to get an observation.
-
+There are lots of hyper-parameters packaged into an `HParams` object
+(see: [vaeseq/hparams.py](vaeseq/hparams.py)). You can select among
+the architectures above by setting the `vae_type` parameter.
 
 ## Examples
 
 When you build and install this library via `python setup.py install`,
-the following example programs are installed as well:
+the following example programs are installed as well. See:
+[vaeseq/examples](vaeseq/examples).
 
 ### Text
 
@@ -88,4 +124,11 @@ $ vaeseq-text evaluate --log-dir /tmp/text --vocab-corpus input.txt \
 ### MIDI
 
 Similar to the text example above, but now modeling MIDI music
-(specifically, piano rolls). Installed under `vaeseq-midi`.
+(specifically, piano rolls). Installed under `vaeseq-midi`. Don't
+expect it to sound great.
+
+### Play
+
+An experiment modeling a game environment and using that to train an
+agent via policy gradient. This example uses the OpenAI Gym
+module. Installed under `vaeseq-play`.
