@@ -8,7 +8,7 @@ from . import util
 
 
 def as_context(context, name=None):
-    """Takes a None | Tensors | Context and returns a Context."""
+    """Takes Tensors | Context and returns a Context."""
     if context is None:
         raise ValueError("Please supply a Context or a set of nested tensors.")
     if isinstance(context, Context):
@@ -17,7 +17,7 @@ def as_context(context, name=None):
 
 
 def as_tensors(context, observed):
-    """Takes None | Tensors | Context and returns Tensors."""
+    """Takes Tensors | Context and returns Tensors."""
     if context is None:
         raise ValueError("Please supply a Context or a set of nested tensors.")
     if isinstance(context, Context):
